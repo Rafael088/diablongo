@@ -84,12 +84,13 @@ preferencia de Checkout Pro:
    llama a `https://api.mercadopago.com/checkout/preferences` (COP, `external_reference` =
    `usuario:paquete:uuid`, `X-Idempotency-Key`). Devuelve `{ url }` (el `init_point`) y el navegador va ahí.
 3. Mercado Pago devuelve a `/pagos/vuelta` (informativa: **no acredita**) y avisa a
-   `/api/pagos/webhook` (tarea cotejo-rsvbzn), que es lo único que suma créditos.
+   `/api/pagos/webhook`, que es lo único que suma créditos (abajo).
 
 Variables:
 
 ```sh
 MERCADOPAGO_ACCESS_TOKEN=APP_USR-...   # solo servidor; credenciales de Mercado Pago (usar las de prueba primero)
+MERCADOPAGO_WEBHOOK_SECRET=...         # solo servidor; «clave secreta» de Webhooks en Tus integraciones
 NEXT_PUBLIC_SITE_URL=https://<dominio> # opcional
 ```
 
@@ -98,3 +99,37 @@ existe; si no, el origen de la propia petición. En Vercel con dominio propio co
 podría ser el de un preview). Con una URL que no sea `https` (localhost) no se manda `auto_return`, porque
 Mercado Pago lo rechaza; la persona vuelve con el botón de Mercado Pago. El webhook no llega a localhost:
 para probarlo entero hace falta un túnel https y `NEXT_PUBLIC_SITE_URL` apuntando a él.
+
+## Webhook de Mercado Pago (`POST /api/pagos/webhook`)
+
+Lo único que suma créditos. Mercado Pago avisa con `?data.id=<pago>&type=payment` y reintenta cada
+15 minutos mientras no reciba un 2xx.
+
+1. **Firma:** `x-signature: ts=…,v1=…` debe ser el HMAC-SHA256 (hex) de
+   `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` con `MERCADOPAGO_WEBHOOK_SECRET`; es el mismo
+   algoritmo que `WebhookSignatureValidator` del SDK oficial (`lib/webhookMp.ts`). Si no cuadra: 401.
+2. **Consulta el pago** a `GET /v1/payments/<id>`: nunca se cree lo que trae el aviso.
+3. **Acredita solo** si el pago está `approved`, en `COP`, con monto ≥ el precio del paquete y con una
+   `external_reference` nuestra (`usuario:paquete:uuid`). Los créditos salen de `lib/paquetes.ts`.
+4. `acreditar_compra` usa el **id del pago** como referencia única: un aviso repetido responde
+   `{ acreditado: false }` y no suma otra vez.
+
+| Respuesta | Cuándo | ¿Mercado Pago reintenta? |
+| --- | --- | --- |
+| 200 | acreditado, ya acreditado, pendiente/rechazado, aviso que no es de pago, pago inexistente (avisos de prueba del panel), algo no cuadra (monto, moneda, referencia, cuenta borrada: queda en el log para revisar a mano) | No |
+| 401 | firma inválida o ausente | Sí, y seguirá fallando: revisar la clave |
+| 502 | Mercado Pago no devolvió el pago | Sí |
+| 500 / 503 | la base falló / falta configuración | Sí |
+
+**Configurarlo:** en Mercado Pago → Tus integraciones → la aplicación → **Webhooks**: URL
+`https://<dominio>/api/pagos/webhook`, evento **Pagos**, y copiar la clave secreta a
+`MERCADOPAGO_WEBHOOK_SECRET`. La preferencia también manda `notification_url` con esa misma ruta.
+
+**Fuera de alcance por ahora:** reembolsos y contracargos (`refunded`, `charged_back`) no descuentan
+créditos; si pasan, ajustar a mano con un movimiento `ajuste`. Si se cambia el precio de un paquete
+mientras hay pagos en curso, se compara con el precio nuevo.
+
+**Probarlo a mano:** con credenciales de prueba y la app en un dominio https (Vercel preview o túnel con
+`NEXT_PUBLIC_SITE_URL`), comprar un paquete con una tarjeta de prueba aprobada: a los segundos el panel
+muestra los créditos. «Simular notificación» del panel de Webhooks debe responder 200 sin acreditar (el
+pago de la simulación no existe).
