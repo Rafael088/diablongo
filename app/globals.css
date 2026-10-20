@@ -222,3 +222,13 @@ input[type="range"]::-webkit-slider-thumb {
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
 }
+
+/* Selector de modo (Gratis / Conectar OpenRouter / Mi key) y avisos de la configuración */
+.config-modo { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px; background: var(--color-fondo); border: 2px solid var(--color-borde); border-radius: 0; color: var(--color-texto); cursor: pointer; }
+.config-modo:hover { border-color: var(--color-texto-suave); }
+.config-modo-activo { border-color: var(--color-angel); background: var(--color-superficie); }
+.config-modo-titulo { font-size: 0.7rem; line-height: 1.6; }
+.config-modo-activo .config-modo-titulo { color: var(--color-angel); }
+.config-modo-detalle { color: var(--color-texto-suave); font-size: 0.9rem; }
+.config-aviso { border: 2px solid var(--color-borde); background: var(--color-fondo); padding: 12px; color: var(--color-texto); }
+.config-aviso-alerta { border-color: var(--color-diablo); }

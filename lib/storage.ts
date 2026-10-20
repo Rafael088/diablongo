@@ -36,6 +36,8 @@ export function deleteDebate(id: string): void {
 
 export interface SavedConfig {
   topic: string;
+  /** Modo de la pantalla de configuración (ausente en configs viejas). */
+  modo?: string;
   proProvider: string;
   proModel: string;
   conProvider: string;
@@ -53,9 +55,9 @@ function localDelNavegador(): Storage | null {
 
 export function saveConfig(config: SavedConfig, storage: Storage | null = localDelNavegador()): void {
   if (!storage) return;
-  const { topic, proProvider, proModel, conProvider, conModel } = config;
+  const { topic, modo, proProvider, proModel, conProvider, conModel } = config;
   try {
-    storage.setItem(CONFIG_KEY, JSON.stringify({ topic, proProvider, proModel, conProvider, conModel }));
+    storage.setItem(CONFIG_KEY, JSON.stringify({ topic, modo, proProvider, proModel, conProvider, conModel }));
   } catch {
     // storage lleno o bloqueado: la config simplemente no se recuerda
   }
