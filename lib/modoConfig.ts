@@ -1,9 +1,16 @@
 import { PROVEEDOR_GRATIS } from "./gratis.ts";
+import { PROVEEDOR_CREDITOS } from "./creditosDebate.ts";
 
-// Los tres modos de la pantalla de configuración son excluyentes.
-export type ModoConfig = "gratis" | "openrouter" | "key";
+// Los modos de la pantalla de configuración son excluyentes. «creditos» solo se ofrece si hay
+// cuentas (Supabase configurado): modelos de pago con la key del servidor, cobrados en créditos.
+export type ModoConfig = "gratis" | "openrouter" | "key" | "creditos";
 
-export const MODOS: readonly ModoConfig[] = ["gratis", "openrouter", "key"];
+export const MODOS: readonly ModoConfig[] = ["gratis", "openrouter", "key", "creditos"];
+
+/** Modo y proveedor que pone el servidor (sin key ni modelo del cliente). */
+export function modoDelServidor(modo: ModoConfig): boolean {
+  return modo === "gratis" || modo === "creditos";
+}
 
 export function esModo(valor: unknown): valor is ModoConfig {
   return typeof valor === "string" && (MODOS as readonly string[]).includes(valor);
@@ -22,9 +29,13 @@ interface ConfigGuardada {
  * Modo con el que abre la pantalla. Una preferencia guardada manda; si no hay (configs viejas),
  * se deduce de los proveedores guardados y, sin nada guardado, de si ya hay alguna key.
  */
-export function modoInicial(guardada: ConfigGuardada | null, hayKeys: boolean): ModoConfig {
+export function modoInicial(guardada: ConfigGuardada | null, hayKeys: boolean, hayCuentas = true): ModoConfig {
   const m = guardada?.modo;
-  if (esModo(m)) return m === "openrouter" && !OPENROUTER_DISPONIBLE ? "gratis" : m;
+  if (esModo(m)) {
+    if (m === "openrouter" && !OPENROUTER_DISPONIBLE) return "gratis";
+    if (m === "creditos" && !hayCuentas) return "gratis";
+    return m;
+  }
   if (guardada?.proProvider || guardada?.conProvider) {
     const alguno = [guardada.proProvider, guardada.conProvider].some((p) => p && p !== PROVEEDOR_GRATIS);
     return alguno ? "key" : "gratis";
@@ -51,6 +62,7 @@ export function puedeIniciar(opts: {
 /** Proveedor que usa cada debatiente según el modo (en «key» elige la persona; en el resto no hay elección). */
 export function proveedorDelModo(modo: ModoConfig, elegido: string): string {
   if (modo === "openrouter") return "openrouter";
+  if (modo === "creditos") return PROVEEDOR_CREDITOS;
   return modo === "gratis" ? PROVEEDOR_GRATIS : elegido;
 }
 

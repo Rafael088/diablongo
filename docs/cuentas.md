@@ -133,3 +133,26 @@ mientras hay pagos en curso, se compara con el precio nuevo.
 `NEXT_PUBLIC_SITE_URL`), comprar un paquete con una tarjeta de prueba aprobada: a los segundos el panel
 muestra los créditos. «Simular notificación» del panel de Webhooks debe responder 200 sin acreditar (el
 pago de la simulación no existe).
+
+## Debates con créditos (modo «Con créditos»)
+
+Cuarto modo de la configuración; solo aparece si las cuentas están configuradas. Ángel y Diablo juegan con
+modelos de pago y la key del servidor (`OPENROUTER_API_KEY`), como el modo gratis pero sin límite diario.
+Modelos y costo están en `lib/creditosDebate.ts` (**provisionales** hasta cotejo-j9s6uq): 1 crédito por
+debate; Claude Haiku 5.5 / Gemini 3.8 Flash para el Ángel y Gemini 3.8 Flash / DeepSeek V4 Pro para el
+Diablo (el segundo de cada lista es el respaldo). Un debate de 9 llamadas cuesta menos de 2 centavos de dólar.
+
+- **Cobro:** `POST /api/debate/start` exige sesión (401), los dos personajes en créditos (400) y saldo (402).
+  `guardiaCreditos` (la última guardia, después de Turnstile) llama a `descontar_debate` con el **id del
+  debate** que se va a firmar, y el token lleva la cuenta que pagó (`u`). Si algo falla después de cobrar y
+  antes de dar el token, se devuelve.
+- **Devolución:** si en un **turno del debate** fallan todos los modelos (o la key del servidor), se llama a
+  `devolver_debate`, se cierran los turnos que quedaban (nadie sigue jugando gratis tras la devolución) y la
+  respuesta lleva `devuelto: true, terminado: true`. El crédito vuelve a quien pagó, una sola vez.
+- **Desenlace:** si falla solo el desenlace no se devuelve (el cliente tiene plantilla local y el debate ya se
+  jugó); el turno se libera para reintentarlo.
+- Un debate abandonado a medias no se devuelve: el crédito se cobra al empezar.
+
+**Probarlo a mano:** con cuentas y `OPENROUTER_API_KEY` configuradas, sumar créditos de prueba en el SQL Editor
+(`select * from public.acreditar_compra('<id>', 3, 'prueba-1');`), elegir «Con créditos» y jugar: el saldo baja
+en 1 al empezar (se ve al volver a la portada). Sin créditos, «Iniciar Debate» responde que no alcanzan.

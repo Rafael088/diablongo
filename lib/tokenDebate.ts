@@ -14,7 +14,8 @@ import { esObjeto, validarProveedorModelo, validarTema } from "./validarTurno.ts
  * Payload (PayloadToken): v (versión), id (UUID del debate), th (HMAC del tema:
  * el tema NUNCA va en claro y no se puede adivinar sin el secreto), pro/con
  * (proveedor y modelo de cada personaje; el modelo es "" en modo gratis), n
- * (llamadas permitidas = TOTAL_LLAMADAS = 8 turnos + 1 desenlace), iat/exp (ms).
+ * (llamadas permitidas = TOTAL_LLAMADAS = 8 turnos + 1 desenlace), iat/exp (ms)
+ * y, solo en modo créditos, u (UUID de la cuenta que pagó: a quién devolver).
  * Nunca lleva la clave de API.
  *
  * El token es reutilizable por sí solo, así que cada turno manda además su
@@ -54,6 +55,8 @@ export interface PayloadToken {
   n: number;
   iat: number;
   exp: number;
+  /** Cuenta que pagó el debate (solo modo créditos). */
+  u?: string;
 }
 
 /** Configuración del debate que llega a /start (sin claves). */
@@ -116,9 +119,11 @@ export function firmarPayload(payload: PayloadToken, secreto: Buffer): string {
 export function emitirToken(
   config: ConfigInicio,
   secreto: Buffer,
-  ahora = Date.now()
+  ahora = Date.now(),
+  /** id ya elegido (p. ej. el que se cobró en créditos) y cuenta que pagó. */
+  opciones: { id?: string; usuario?: string } = {}
 ): { token: string; payload: PayloadToken } {
-  const id = randomUUID();
+  const id = opciones.id ?? randomUUID();
   const payload: PayloadToken = {
     v: VERSION_TOKEN,
     id,
@@ -128,6 +133,7 @@ export function emitirToken(
     n: TOTAL_LLAMADAS,
     iat: ahora,
     exp: ahora + DURACION_TOKEN_MS,
+    ...(opciones.usuario ? { u: opciones.usuario } : {}),
   };
   return { token: firmarPayload(payload, secreto), payload };
 }
@@ -164,7 +170,8 @@ function esPayload(x: unknown): x is PayloadToken {
     x.n <= TOTAL_LLAMADAS &&
     esEntero(x.iat) &&
     esEntero(x.exp) &&
-    x.exp > x.iat
+    x.exp > x.iat &&
+    (x.u === undefined || (typeof x.u === "string" && UUID.test(x.u)))
   );
 }
 
