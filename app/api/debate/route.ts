@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { TurnRequest, TurnResponse } from "@/types";
-import { buildSystemPrompt, buildUserPrompt } from "@/lib/debateEngine";
+import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts";
 import { getProviderById } from "@/lib/providers";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
