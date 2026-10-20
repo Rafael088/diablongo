@@ -1,4 +1,4 @@
-import { ProviderConfig } from "@/types";
+import type { ProviderConfig } from "@/types";
 
 export const providers: ProviderConfig[] = [
   {

@@ -1,32 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { TurnRequest, TurnResponse } from "@/types";
+import type { TurnResponse } from "@/types";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts";
-import { getProviderById } from "@/lib/providers";
+import { validarTurno } from "@/lib/validarTurno";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const body: TurnRequest = await request.json();
-    const { topic, role, phase, provider: providerId, model, apiKey, history, intervention } = body;
-
-    if (!topic || !role || !providerId || !model) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "El cuerpo de la petición no es JSON." }, { status: 400 });
     }
 
-    const provider = getProviderById(providerId);
-    if (!provider) {
-      return NextResponse.json({ error: "Provider not found" }, { status: 400 });
+    const validacion = validarTurno(body);
+    if (!validacion.ok) {
+      return NextResponse.json({ error: validacion.error }, { status: validacion.status });
     }
-
-    if (provider.requiresApiKey && !apiKey) {
-      return NextResponse.json(
-        { error: `API key required for ${provider.name}` },
-        { status: 400 }
-      );
-    }
+    const { topic, role, phase, provider, model, apiKey, history, intervention } = validacion.datos;
+    const providerId = provider.id;
 
     const systemPrompt = buildSystemPrompt(role);
     const userPrompt = buildUserPrompt(topic, role, phase, history, intervention);

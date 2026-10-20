@@ -26,14 +26,18 @@ export interface DebateMessage {
   phase: DebatePhase;
 }
 
-export type DebatePhase =
-  | "opening"
-  | "rebuttal"
-  | "counter"
-  | "closing"
-  | "intervention"
+/** Fases válidas de un turno. Única fuente: la usa también la validación del servidor. */
+export const FASES = [
+  "opening",
+  "rebuttal",
+  "counter",
+  "closing",
+  "intervention",
   /** Fase 9: el personaje elegido escribe el desenlace de la tarjeta final. */
-  | "desenlace";
+  "desenlace",
+] as const;
+
+export type DebatePhase = (typeof FASES)[number];
 
 export interface DebateConfig {
   topic: string;
