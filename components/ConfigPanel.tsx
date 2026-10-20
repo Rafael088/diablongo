@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { proveedoresDisponibles, getProviderById } from "@/lib/providers";
 import { DebateConfig, DebaterConfig, ProviderConfig } from "@/types";
@@ -8,7 +8,16 @@ import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
 import { Swords, Settings2, Eye, EyeOff } from "lucide-react";
 import { AVISO_RECORDAR, estaRecordada, guardarKey, leerKey, olvidarKey } from "@/lib/keys";
 import { MAX_TEMA } from "@/lib/topes";
-import { PROVEEDOR_GRATIS } from "@/lib/gratis";
+import {
+  EstadoContador,
+  ModoConfig,
+  OPENROUTER_DISPONIBLE,
+  modoInicial,
+  pedirCupo,
+  proveedorDelModo,
+  puedeIniciar,
+  textoContador,
+} from "@/lib/modoConfig";
 import TurnstileWidget from "./TurnstileWidget";
 
 interface ConfigPanelProps {
@@ -46,15 +55,9 @@ function modeloValido(providerId: string, model: string): string {
   return p && !p.models.includes(model) ? p.models[0] : model;
 }
 
-// Un proveedor guardado que ya no está disponible (p. ej. ollama en producción) cae al primero.
-// Modo «Gratis» (el servidor pone key y modelo): es el valor por defecto si la persona no tiene ninguna key guardada.
-function proveedorValido(
-  id: string | undefined,
-  disponibles: ProviderConfig[],
-  hayKeys: boolean
-): string {
-  if (id === PROVEEDOR_GRATIS) return PROVEEDOR_GRATIS;
-  if (!hayKeys) return PROVEEDOR_GRATIS;
+// Un proveedor guardado que ya no está disponible (p. ej. ollama en producción), o el modo gratis,
+// cae al primero: el selector de proveedor solo existe en el modo «Mi key».
+function proveedorValido(id: string | undefined, disponibles: ProviderConfig[]): string {
   return disponibles.find((p) => p.id === id)?.id ?? disponibles[0].id;
 }
 
@@ -62,12 +65,13 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
   const disponibles = proveedoresDisponibles();
   const porDefecto = disponibles[0];
   const hayKeys = disponibles.some((p) => leerKey(p.id) !== "");
+  const [modo, setModo] = useState<ModoConfig>(() => modoInicial(saved, hayKeys));
   const [topic, setTopic] = useState((saved?.topic ?? "").slice(0, MAX_TEMA));
 
-  const [proProvider, setProProvider] = useState(proveedorValido(saved?.proProvider, disponibles, hayKeys));
+  const [proProvider, setProProvider] = useState(proveedorValido(saved?.proProvider, disponibles));
   const [proModelRaw, setProModel] = useState(saved?.proModel ?? porDefecto.models[0]);
 
-  const [conProvider, setConProvider] = useState(proveedorValido(saved?.conProvider, disponibles, hayKeys));
+  const [conProvider, setConProvider] = useState(proveedorValido(saved?.conProvider, disponibles));
   const [conModelRaw, setConModel] = useState(saved?.conModel ?? porDefecto.models[1]);
 
   // Una key por proveedor (si Ángel y Diablo usan el mismo, comparten key).
@@ -94,20 +98,37 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
   const [tokenTurnstile, setTokenTurnstile] = useState<string | null>(null);
   const verificado = OMITIR_TURNSTILE || tokenTurnstile !== null;
 
+  // Contador de debates gratis de hoy: solo se pide en el modo Gratis y nunca rompe la pantalla.
+  const [contadorPedido, setContadorPedido] = useState<EstadoContador | null>(null);
+  useEffect(() => {
+    if (modo !== "gratis") return;
+    const ac = new AbortController();
+    pedirCupo(fetch, ac.signal).then((e) => {
+      if (!ac.signal.aborted) setContadorPedido(e);
+    });
+    return () => ac.abort();
+  }, [modo]);
+  const contador: EstadoContador = contadorPedido ?? { tipo: "cargando" };
+  const puedeEmpezar = puedeIniciar({ modo, tema: topic, verificado, contador });
+
   const proModel = modeloValido(proProvider, proModelRaw);
   const conModel = modeloValido(conProvider, conModelRaw);
 
   const handleStart = () => {
-    if (!topic.trim() || !verificado) return;
+    if (!puedeEmpezar) return;
+    const proProv = proveedorDelModo(modo, proProvider);
+    const conProv = proveedorDelModo(modo, conProvider);
+    const gratis = modo === "gratis";
 
     saveConfig({
       topic,
+      modo,
       proProvider,
       proModel,
       conProvider,
       conModel,
     });
-    for (const id of new Set([proProvider, conProvider])) {
+    for (const id of gratis ? [] : new Set([proProvider, conProvider])) {
       if (getProviderById(id)?.requiresApiKey) {
         guardarKey(id, keys[id] ?? "", { recordar: recordar[id] ?? false });
       }
@@ -115,17 +136,17 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
 
     const pro: DebaterConfig = {
       role: "pro",
-      provider: proProvider,
-      model: proProvider === PROVEEDOR_GRATIS ? "" : proModel,
-      apiKey: proProvider === PROVEEDOR_GRATIS ? "" : proApiKey,
+      provider: proProv,
+      model: gratis ? "" : proModel,
+      apiKey: gratis ? "" : proApiKey,
       name: "PRO",
     };
 
     const con: DebaterConfig = {
       role: "con",
-      provider: conProvider,
-      model: conProvider === PROVEEDOR_GRATIS ? "" : conModel,
-      apiKey: conProvider === PROVEEDOR_GRATIS ? "" : conApiKey,
+      provider: conProv,
+      model: gratis ? "" : conModel,
+      apiKey: gratis ? "" : conApiKey,
       name: "CON",
     };
 
@@ -166,6 +187,17 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
             </p>
           </div>
 
+          <SelectorModo modo={modo} onChange={setModo} />
+
+          {modo === "gratis" && <ContadorGratis estado={contador} />}
+
+          {modo === "openrouter" && (
+            <p className="config-aviso" role="status">
+              Conectar con OpenRouter llega pronto. Mientras tanto usa el modo Gratis o pon tu propia key.
+            </p>
+          )}
+
+          {modo === "key" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <DebaterForm
               title="Defensor (PRO)"
@@ -194,6 +226,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
               onDesconectar={() => desconectar(conProvider)}
             />
           </div>
+          )}
 
           {SITEKEY_TURNSTILE ? (
             <TurnstileWidget sitekey={SITEKEY_TURNSTILE} onToken={setTokenTurnstile} />
@@ -207,14 +240,16 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
 
           <button
             onClick={handleStart}
-            disabled={!topic.trim() || !verificado}
+            disabled={!puedeEmpezar}
             className="config-iniciar"
           >
             Iniciar Debate
           </button>
 
           <p className="config-nota">
-            Tu API key se guarda solo en esta pestaña y se borra al cerrarla, salvo que marques «Recordar en este dispositivo». Nunca se envía a ningún servidor propio.
+            {modo === "key"
+              ? "Tu API key se guarda solo en esta pestaña y se borra al cerrarla, salvo que marques «Recordar en este dispositivo». Nunca se envía a ningún servidor propio."
+              : "Sin key no guardamos nada tuyo: el servidor pone el modelo y el límite es por día."}
           </p>
         </div>
       </div>
@@ -266,7 +301,6 @@ function DebaterForm({
           onChange={(e) => onProviderChange(e.target.value)}
           className="config-campo"
         >
-          <option value={PROVEEDOR_GRATIS}>Gratis (sin key)</option>
           {proveedoresDisponibles().map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -275,13 +309,6 @@ function DebaterForm({
         </select>
       </div>
 
-      {provider === PROVEEDOR_GRATIS && (
-        <p className="text-xs opacity-70">
-          Sin key: el modelo lo elige el servidor entre modelos gratuitos.
-        </p>
-      )}
-
-      {provider !== PROVEEDOR_GRATIS && (
       <div>
         <label className="config-etiqueta">Modelo</label>
         <select
@@ -296,7 +323,6 @@ function DebaterForm({
           ))}
         </select>
       </div>
-      )}
 
       {providerConfig?.requiresApiKey && (
         <div>
@@ -341,5 +367,43 @@ function DebaterForm({
         </div>
       )}
     </div>
+  );
+}
+
+const OPCIONES_MODO: { id: ModoConfig; titulo: string; detalle: string }[] = [
+  { id: "gratis", titulo: "Gratis", detalle: "Sin key, con un límite por día" },
+  { id: "openrouter", titulo: "Conectar OpenRouter", detalle: OPENROUTER_DISPONIBLE ? "Con tu cuenta" : "Próximamente" },
+  { id: "key", titulo: "Mi key", detalle: "Usa tu propia API key" },
+];
+
+function SelectorModo({ modo, onChange }: { modo: ModoConfig; onChange: (m: ModoConfig) => void }) {
+  return (
+    <div>
+      <span id="modo-etiqueta" className="config-etiqueta">¿Cómo quieres jugar?</span>
+      <div role="radiogroup" aria-labelledby="modo-etiqueta" className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {OPCIONES_MODO.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={modo === o.id}
+            onClick={() => onChange(o.id)}
+            className={`config-modo${modo === o.id ? " config-modo-activo" : ""}`}
+          >
+            <span className="config-modo-titulo">{o.titulo}</span>
+            <span className="config-modo-detalle">{o.detalle}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ContadorGratis({ estado }: { estado: EstadoContador }) {
+  const agotado = estado.tipo === "agotado";
+  return (
+    <p className={`config-aviso${agotado ? " config-aviso-alerta" : ""}`} role="status" aria-live="polite">
+      {textoContador(estado)}
+    </p>
   );
 }
