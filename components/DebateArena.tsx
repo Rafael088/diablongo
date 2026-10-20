@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Bando } from "./PersonajeAnimado";
 import { DebateConfig, DebateMessage, DebateRole } from "@/types";
 import { TOTAL_TURNS, canIntervene, countTurnsPlayed, getTurn } from "@/lib/debateEngine";
 import { useDebate, type DebateStatus, type GenerateTurn } from "@/hooks/useDebate";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
-import PixelSprite from "./PixelSprite";
+import PersonajeAnimado from "./PersonajeAnimado";
 import SummaryPanel from "./SummaryPanel";
 
 interface DebateArenaProps {
@@ -19,6 +20,10 @@ interface DebateArenaProps {
   /** Texto completo sin efecto de máquina de escribir (capturas). */
   instant?: boolean;
   persist?: boolean;
+  /** Quien ganó: dispara la victoria (halo del Ángel o risa y fuego del Diablo). */
+  ganador?: Bando;
+  /** Congela el golpe sobre este personaje (capturas y demo). */
+  golpeFijo?: Bando;
 }
 
 const NOMBRES: Record<DebateRole | "user", string> = {
@@ -33,28 +38,6 @@ const PERSONAJE: Record<DebateRole | "user", PersonajeSprite> = {
   user: "usuario",
 };
 
-function Personaje({
-  quien,
-  fotograma,
-  activo,
-}: {
-  quien: DebateRole | "user";
-  fotograma: FotogramaSprite;
-  activo: boolean;
-}) {
-  return (
-    <div className={`arena-personaje ${activo ? "" : "arena-apagado"}`}>
-      <PixelSprite
-        personaje={PERSONAJE[quien]}
-        fotograma={fotograma}
-        escala={4}
-        className="w-full h-auto"
-      />
-      <span className={`arena-nombre arena-nombre-${quien}`}>{NOMBRES[quien]}</span>
-    </div>
-  );
-}
-
 export default function DebateArena({
   config,
   onReset,
@@ -63,6 +46,8 @@ export default function DebateArena({
   initialStatus,
   instant = false,
   persist = true,
+  ganador,
+  golpeFijo,
 }: DebateArenaProps) {
   const debate = useDebate(config, { generate, initialMessages, initialStatus, persist });
   const { messages, status, thinking, error, textRead } = debate;
@@ -115,12 +100,37 @@ export default function DebateArena({
   const habla: FotogramaSprite = bocaAbierta || (speaker !== null && thinking) ? "hablar" : "reposo";
 
   const frameDe = (quien: DebateRole): FotogramaSprite =>
-    !finished && speaker === quien ? habla : "reposo";
+    ganador === quien
+      ? "victoria"
+      : golpe === quien
+        ? "golpe"
+        : !finished && speaker === quien
+          ? habla
+          : "reposo";
   const frameUsuario: FotogramaSprite = waitingIntervention
     ? "pensar"
     : !finished && last?.role === "user" && speaker === "user"
       ? "decidir"
       : "reposo";
+
+  // Refutado: al empezar a hablar el otro en una refutación o última palabra,
+  // quien recibe la réplica pone cara de golpe un momento.
+  const claveGolpe =
+    !thinking && !finished && last && last.role !== "user" && last.phase !== "opening"
+      ? messages.length
+      : 0;
+  const [claveVista, setClaveVista] = useState(claveGolpe);
+  const [golpeado, setGolpeado] = useState<Bando | null>(null);
+  if (claveGolpe !== claveVista) {
+    setClaveVista(claveGolpe);
+    if (claveGolpe > 0 && last) setGolpeado(last.role === "pro" ? "con" : "pro");
+  }
+  useEffect(() => {
+    if (!golpeado) return;
+    const t = setTimeout(() => setGolpeado(null), 900);
+    return () => clearTimeout(t);
+  }, [golpeado]);
+  const golpe: Bando | null = golpeFijo ?? golpeado;
 
   const handleReset = () => {
     debate.stop();
@@ -156,9 +166,26 @@ export default function DebateArena({
       </div>
 
       <div className="arena-escenario">
-        <Personaje quien="pro" fotograma={frameDe("pro")} activo={speaker === null || speaker === "pro"} />
-        <Personaje quien="user" fotograma={frameUsuario} activo={speaker === null || speaker === "user" || waitingIntervention} />
-        <Personaje quien="con" fotograma={frameDe("con")} activo={speaker === null || speaker === "con"} />
+        {(["pro", "user", "con"] as const).map((quien) => (
+          <PersonajeAnimado
+            key={quien}
+            personaje={PERSONAJE[quien]}
+            fotograma={quien === "user" ? frameUsuario : frameDe(quien)}
+            nombre={NOMBRES[quien]}
+            claseNombre={`arena-nombre-${quien}`}
+            activo={
+              ganador
+                ? ganador === quien
+                : speaker === null ||
+                  speaker === quien ||
+                  (quien === "user" && waitingIntervention)
+            }
+            desfase={quien === "pro" ? 0 : quien === "user" ? 0.9 : 1.7}
+            golpeado={golpe === quien}
+            golpeQuieto={golpeFijo === quien}
+            victorioso={ganador === quien}
+          />
+        ))}
       </div>
 
       <div

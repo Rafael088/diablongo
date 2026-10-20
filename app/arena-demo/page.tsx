@@ -43,17 +43,26 @@ function mensajesHasta(n: number): DebateMessage[] {
 
 function Demo() {
   const router = useRouter();
-  const turno = Number(useSearchParams().get("turno"));
-  const congelada = Number.isInteger(turno) && turno >= 1 && turno <= 8;
+  const params = useSearchParams();
+  const turno = Number(params.get("turno"));
+  const g = params.get("ganador");
+  const ganador = g === "pro" || g === "con" ? g : undefined;
+  const golpe = params.get("golpe");
+  const golpeFijo = golpe === "pro" || golpe === "con" ? golpe : undefined;
+  // ?ganador= y ?golpe= imponen su propio turno congelado (el final o el 4).
+  const turnoFinal = ganador ? 8 : golpeFijo ? 4 : turno;
+  const congelada = Number.isInteger(turnoFinal) && turnoFinal >= 1 && turnoFinal <= 8;
   return (
     <DebateArena
-      key={congelada ? turno : "viva"}
+      key={congelada ? `${turnoFinal}${ganador ?? ""}${golpeFijo ?? ""}` : "viva"}
       config={config}
       onReset={() => router.push("/arena-demo")}
       generate={generate}
       persist={false}
+      ganador={ganador}
+      golpeFijo={golpeFijo}
       {...(congelada
-        ? { initialMessages: mensajesHasta(turno), initialStatus: "paused" as const, instant: true }
+        ? { initialMessages: mensajesHasta(turnoFinal), initialStatus: "paused" as const, instant: true }
         : {})}
     />
   );
