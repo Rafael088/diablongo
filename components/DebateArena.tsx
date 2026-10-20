@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import type { Bando } from "./PersonajeAnimado";
 import { DebateConfig, DebateMessage, DebateRole } from "@/types";
 import { TOTAL_TURNS, canIntervene, countTurnsPlayed, getTurn } from "@/lib/debateEngine";
@@ -11,6 +12,7 @@ import { useSoundEnabled, setSoundEnabled } from "@/hooks/useSoundEnabled";
 import { getBaseFrequency, playBlip, shouldPlayBlip } from "@/lib/blips";
 import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
 import PersonajeAnimado from "./PersonajeAnimado";
+import { MINIMO, TOPE, quienGana, textoGanando, valorDeVotos, type Ganando } from "@/lib/tentacion";
 import SummaryPanel from "./SummaryPanel";
 
 interface DebateArenaProps {
@@ -27,6 +29,10 @@ interface DebateArenaProps {
   ganador?: Bando;
   /** Congela el golpe sobre este personaje (capturas y demo). */
   golpeFijo?: Bando;
+  /** Índices de mensajes que ya llevan 👍 al empezar (demo y capturas). */
+  votosIniciales?: number[];
+  /** Avisa de quién va ganando en la barra de tentación y su valor (-100 a 100). */
+  onTentacionChange?: (estado: { valor: number; ganando: Ganando }) => void;
 }
 
 const NOMBRES: Record<DebateRole | "user", string> = {
@@ -51,12 +57,17 @@ export default function DebateArena({
   persist = true,
   ganador,
   golpeFijo,
+  votosIniciales,
+  onTentacionChange,
 }: DebateArenaProps) {
   const debate = useDebate(config, { generate, initialMessages, initialStatus, persist });
   const { messages, status, thinking, error, textRead } = debate;
   const [interventionText, setInterventionText] = useState("");
   const soundEnabled = useSoundEnabled();
   const prevCountRef = useRef(0);
+  const quieto = useReducedMotion() ?? false;
+  // Votos 👍 por índice de mensaje.
+  const [votos, setVotos] = useState<number[]>(votosIniciales ?? []);
 
   const last = messages.length > 0 ? messages[messages.length - 1] : null;
   const turnsPlayed = countTurnsPlayed(messages);
@@ -161,6 +172,31 @@ export default function DebateArena({
   }, [golpeado]);
   const golpe: Bando | null = golpeFijo ?? golpeado;
 
+  const valorBarra = valorDeVotos(
+    messages.map((m) => m.role),
+    votos,
+  );
+  const ganando = quienGana(valorBarra);
+  useEffect(() => {
+    onTentacionChange?.({ valor: valorBarra, ganando });
+  }, [valorBarra, ganando, onTentacionChange]);
+
+  const votar = (i: number) => setVotos((v) => (v.includes(i) ? v : [...v, i]));
+  const puedeVotar = (i: number) => {
+    const r = messages[i]?.role;
+    return (r === "pro" || r === "con") && !votos.includes(i);
+  };
+  const etiquetaVoto = (i: number) => {
+    const r = messages[i]?.role === "con" ? "con" : "pro";
+    return votos.includes(i)
+      ? `Ya diste 👍 a ${NOMBRES[r]}`
+      : `Dar 👍 a esta frase: apoyas al ${NOMBRES[r]}`;
+  };
+  const ultimoIdx = messages.length - 1;
+  const mostrarVoto =
+    !thinking && done && last !== null && (last.role === "pro" || last.role === "con");
+  const posBarra = ((valorBarra - MINIMO) / (TOPE - MINIMO)) * 100;
+
   const handleReset = () => {
     debate.stop();
     onReset();
@@ -217,6 +253,31 @@ export default function DebateArena({
         ))}
       </div>
 
+      <div className="barra-tentacion">
+        <span className="barra-extremo barra-extremo-pro" aria-hidden="true">😇</span>
+        <div
+          className="barra-pista"
+          role="meter"
+          aria-label="Barra de tentación"
+          aria-valuemin={MINIMO}
+          aria-valuemax={TOPE}
+          aria-valuenow={valorBarra}
+          aria-valuetext={textoGanando(ganando)}
+        >
+          <div className="barra-mitad barra-mitad-pro" />
+          <div className="barra-mitad barra-mitad-con" />
+          <div className="barra-centro" />
+          <motion.div
+            className="barra-marcador"
+            initial={false}
+            animate={{ left: `${posBarra}%` }}
+            transition={quieto ? { duration: 0 } : { type: "spring", stiffness: 260, damping: 18 }}
+          />
+        </div>
+        <span className="barra-extremo barra-extremo-con" aria-hidden="true">😈</span>
+      </div>
+      <p className="barra-texto">{textoGanando(ganando)}</p>
+
       <div
         className="caja-dialogo"
         onClick={cajaClicable ? skip : undefined}
@@ -238,6 +299,19 @@ export default function DebateArena({
               {shown}
               {!done && <span className="caja-cursor" aria-hidden="true" />}
             </p>
+            {mostrarVoto && (
+              <button
+                className="voto-boton"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  votar(ultimoIdx);
+                }}
+                disabled={!puedeVotar(ultimoIdx)}
+                aria-label={etiquetaVoto(ultimoIdx)}
+              >
+                <span aria-hidden="true">👍</span>
+              </button>
+            )}
             {done && !thinking && !waitingIntervention && !error && status === "running" && (
               <span className="caja-flecha" aria-hidden="true">▼</span>
             )}
@@ -304,7 +378,17 @@ export default function DebateArena({
           <ol>
             {messages.map((m, i) => (
               <li key={i}>
-                <strong className={`arena-nombre-${m.role}`}>{NOMBRES[m.role]}:</strong> {m.content}
+                <strong className={`arena-nombre-${m.role}`}>{NOMBRES[m.role]}:</strong> {m.content}{" "}
+                {(m.role === "pro" || m.role === "con") && (
+                  <button
+                    className="voto-boton voto-chico"
+                    onClick={() => votar(i)}
+                    disabled={!puedeVotar(i)}
+                    aria-label={etiquetaVoto(i)}
+                  >
+                    <span aria-hidden="true">👍</span>
+                  </button>
+                )}
               </li>
             ))}
           </ol>

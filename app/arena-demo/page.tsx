@@ -41,6 +41,17 @@ function mensajesHasta(n: number): DebateMessage[] {
   }));
 }
 
+/** ?votos=pro,pro,con precarga 👍: cada uno cae en la siguiente frase de ese bando. */
+function indicesDeVotos(param: string | null, mensajes: DebateMessage[]): number[] {
+  if (!param) return [];
+  const usados = new Set<number>();
+  for (const b of param.split(",")) {
+    const i = mensajes.findIndex((m, k) => m.role === b && !usados.has(k));
+    if (i >= 0) usados.add(i);
+  }
+  return [...usados];
+}
+
 function Demo() {
   const router = useRouter();
   const params = useSearchParams();
@@ -52,15 +63,19 @@ function Demo() {
   // ?ganador= y ?golpe= imponen su propio turno congelado (el final o el 4).
   const turnoFinal = ganador ? 8 : golpeFijo ? 4 : turno;
   const congelada = Number.isInteger(turnoFinal) && turnoFinal >= 1 && turnoFinal <= 8;
+  const votosIniciales = congelada
+    ? indicesDeVotos(params.get("votos"), mensajesHasta(turnoFinal))
+    : undefined;
   return (
     <DebateArena
-      key={congelada ? `${turnoFinal}${ganador ?? ""}${golpeFijo ?? ""}` : "viva"}
+      key={congelada ? `${turnoFinal}${ganador ?? ""}${golpeFijo ?? ""}${params.get("votos") ?? ""}` : "viva"}
       config={config}
       onReset={() => router.push("/arena-demo")}
       generate={generate}
       persist={false}
       ganador={ganador}
       golpeFijo={golpeFijo}
+      votosIniciales={votosIniciales}
       {...(congelada
         ? { initialMessages: mensajesHasta(turnoFinal), initialStatus: "paused" as const, instant: true }
         : {})}
