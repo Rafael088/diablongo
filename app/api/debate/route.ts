@@ -3,7 +3,15 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { TurnResponse } from "@/types";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts";
 import { esObjeto, validarTurno } from "@/lib/validarTurno";
-import { MENSAJE_GRATIS_NO_DISPONIBLE, PROVEEDOR_GRATIS, elegirModeloGratis } from "@/lib/gratis";
+import {
+  AVISO_RESPALDO_GRATIS,
+  MENSAJE_GRATIS_AGOTADO,
+  MENSAJE_GRATIS_NO_DISPONIBLE,
+  PROVEEDOR_GRATIS,
+  elegirModeloGratis,
+  ErrorDeModelo,
+  esFalloDeModelo,
+} from "@/lib/gratis";
 import { MAX_CUERPO_BYTES, MAX_TOKENS_RESPUESTA } from "@/lib/topes";
 import { MENSAJE_SIN_SECRETO, comprobarTurno, obtenerSecreto, verificarToken } from "@/lib/tokenDebate";
 import { obtenerRegistroTurnos } from "@/lib/registroTurnos";
@@ -84,18 +92,45 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const userPrompt = buildUserPrompt(topic, role, phase, history, intervention);
 
     let content: string;
+    let aviso: string | undefined;
     try {
-      content =
-        providerId === "gemini"
-          ? await callGemini(model, apiKey, systemPrompt, userPrompt)
-          : await callOpenAICompatible(provider.baseUrl!, model, apiKey, systemPrompt, userPrompt);
+      if (providerId === "gemini") {
+        content = await callGemini(model, apiKey, systemPrompt, userPrompt);
+      } else if (providerId === PROVEEDOR_GRATIS) {
+        // Respaldo en el servidor: si el modelo da 429 o se cae, se prueba el siguiente de la lista.
+        // Es el mismo turno (mismo índice, mismo token): no gasta otra llamada del límite diario.
+        content = "";
+        let ultimo: unknown;
+        let resuelto = false;
+        for (let intento = 0; ; intento++) {
+          const candidato = elegirModeloGratis(role, intento);
+          if (!candidato) break;
+          try {
+            content = await callOpenAICompatible(provider.baseUrl!, candidato, apiKey, systemPrompt, userPrompt);
+            resuelto = true;
+            if (intento > 0) aviso = AVISO_RESPALDO_GRATIS;
+            break;
+          } catch (error) {
+            ultimo = error;
+            if (!esFalloDeModelo(error)) throw error;
+            console.warn(`Modelo gratis ${candidato} falló; probando el siguiente.`);
+          }
+        }
+        if (!resuelto) {
+          console.error("Todos los modelos gratis fallaron:", ultimo);
+          await registro.liberar(debateId, turno.indice);
+          return NextResponse.json({ error: MENSAJE_GRATIS_AGOTADO }, { status: 503 });
+        }
+      } else {
+        content = await callOpenAICompatible(provider.baseUrl!, model, apiKey, systemPrompt, userPrompt);
+      }
     } catch (error) {
       // Sin respuesta del proveedor: el turno se devuelve para poder reintentarlo.
       await registro.liberar(debateId, turno.indice);
       throw error;
     }
 
-    const response: TurnResponse = { content };
+    const response: TurnResponse = aviso ? { content, aviso } : { content };
     return NextResponse.json(response);
   } catch (error) {
     console.error("Debate API error:", error);
@@ -125,23 +160,31 @@ async function callOpenAICompatible(
     headers["X-Title"] = "Agent Debate";
   }
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: MAX_TOKENS_RESPUESTA,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: MAX_TOKENS_RESPUESTA,
+      }),
+    });
+  } catch (error) {
+    throw new ErrorDeModelo(error instanceof Error ? error.message : "error de red");
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`API error (${response.status}): ${apiKey ? errorText.split(apiKey).join("[oculta]") : errorText}`);
+    throw new ErrorDeModelo(
+      `API error (${response.status}): ${apiKey ? errorText.split(apiKey).join("[oculta]") : errorText}`,
+      response.status
+    );
   }
 
   const data = await response.json();

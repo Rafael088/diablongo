@@ -6,6 +6,7 @@ import { POST as START } from "@/app/api/debate/start/route";
 import { TOTAL_LLAMADAS, TOTAL_TURNS, TURN_PLAN } from "@/lib/debateEngine";
 import { DURACION_TOKEN_MS, MENSAJE_SIN_SECRETO } from "@/lib/tokenDebate";
 import { providers } from "@/lib/providers";
+import { MENSAJE_GRATIS_AGOTADO, MODELOS_GRATIS } from "@/lib/gratis";
 import {
   MAX_CUERPO_BYTES,
   MAX_INTERVENCION,
@@ -385,5 +386,62 @@ describe("POST /api/debate: token del debate", () => {
     expect((await crudo(turno(token, 0))).status).toBe(500);
     expect((await crudo(turno(token, 0))).status).toBe(200);
     expect((await crudo(turno(token, 0))).status).toBe(409);
+  });
+});
+
+describe("modo gratis: respaldo entre modelos", () => {
+  const gratis = { ...base, provider: "gratis", model: "", apiKey: "" };
+  const ok = () => new Response(JSON.stringify({ choices: [{ message: { content: "Voz del respaldo" } }] }), { status: 200 });
+  const modelosLlamados = () => fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string).model);
+
+  beforeEach(() => {
+    vi.stubEnv("OPENROUTER_API_KEY", "sk-servidor");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("429 en el primero: pasa al siguiente y avisa", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(new Response("rate", { status: 429 })).mockResolvedValueOnce(ok());
+    const { status, json } = await llamar(gratis);
+    expect(status).toBe(200);
+    expect(json.content).toBe("Voz del respaldo");
+    expect((json as { aviso?: string }).aviso).toBeTruthy();
+    const m = modelosLlamados();
+    expect(m).toHaveLength(2);
+    expect(m[0]).toBe(MODELOS_GRATIS.pro[0]);
+    expect(m[1]).toBe(MODELOS_GRATIS.pro[1]);
+  });
+
+  it("caída 5xx o error de red: pasa al siguiente", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(new Response("boom", { status: 503 })).mockRejectedValueOnce(new TypeError("fetch failed"));
+    // la lista tiene 2 modelos: si ambos caen, error claro; con un tercero de prueba no hay, así que comprobamos el paso del 5xx
+    const r = await llamar(gratis);
+    expect(r.status).toBe(503);
+    expect(modelosLlamados()).toHaveLength(2);
+
+    fetchMock.mockReset();
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed")).mockResolvedValueOnce(ok());
+    const r2 = await llamar(gratis);
+    expect(r2.status).toBe(200);
+    expect(r2.json.content).toBe("Voz del respaldo");
+  });
+
+  it("todos fallan: error claro y el turno se libera", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async () => new Response("rate", { status: 429 }));
+    const r = await llamar(gratis);
+    expect(r.status).toBe(503);
+    expect(r.json.error).toBe(MENSAJE_GRATIS_AGOTADO);
+    expect(fetchMock).toHaveBeenCalledTimes(MODELOS_GRATIS.pro.length);
+  });
+
+  it("un 401 no es del modelo: no se reintenta", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async () => new Response("no", { status: 401 }));
+    const r = await llamar(gratis);
+    expect(r.status).toBe(500);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

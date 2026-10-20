@@ -52,6 +52,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   const [status, setStatus] = useState<DebateStatus>(initialStatus);
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const pendingRef = useRef(false);
   const messagesRef = useRef<DebateMessage[]>(initialMessages ?? []);
@@ -114,6 +115,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
       const debater = speaker === "pro" ? config.pro : config.con;
       setThinking(true);
       setError(null);
+      setAviso(null);
 
       try {
         // Lo que el usuario dijo y este personaje aún no contestó (va también en el historial).
@@ -153,7 +155,9 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
             throw new Error(data.error || `Error ${response.status}`);
           }
 
-          content = (await response.json()).content;
+          const datos = await response.json();
+          content = datos.content;
+          if (typeof datos.aviso === "string") setAviso(datos.aviso);
         }
 
         const newMessage: DebateMessage = {
@@ -330,5 +334,5 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
     [config, generate]
   );
 
-  return { messages, status, thinking, error, play, pause, intervene, textRead, stop, pedirDesenlace };
+  return { messages, status, thinking, error, aviso, play, pause, intervene, textRead, stop, pedirDesenlace };
 }

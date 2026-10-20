@@ -109,6 +109,7 @@ input[type="range"]::-webkit-slider-thumb {
 .caja-cursor { display: inline-block; width: 0.6em; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: var(--caja-texto); }
 .caja-flecha { position: absolute; right: 12px; bottom: 6px; font-size: 0.8rem; }
 .caja-centro { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 6rem; text-align: center; }
+.caja-aviso { margin-top: 8px; opacity: 0.75; font-size: 0.8rem; }
 .caja-error { margin-top: 8px; color: var(--arena-error); font-size: 0.85rem; }
 .caja-intervencion { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .caja-pregunta { color: var(--nombre-user); }

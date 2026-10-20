@@ -75,7 +75,7 @@ export default function DebateArena({
   volcadoTarjeta = false,
 }: DebateArenaProps) {
   const debate = useDebate(config, { generate, initialMessages, initialStatus, persist, turnstile });
-  const { messages, status, thinking, error, textRead } = debate;
+  const { messages, status, thinking, error, aviso, textRead } = debate;
   const [interventionText, setInterventionText] = useState("");
   const soundEnabled = useSoundEnabled();
   const marcador = useMarcador();
@@ -360,6 +360,10 @@ export default function DebateArena({
               <span className="caja-flecha" aria-hidden="true">▼</span>
             )}
           </>
+        )}
+
+        {aviso && !error && (
+          <p className="caja-aviso" role="status">{aviso}</p>
         )}
 
         {error && (
