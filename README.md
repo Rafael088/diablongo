@@ -1,15 +1,18 @@
 # Agent Debate
 
-Pon a dos IAs a debatir cualquier tema. App web construida con Next.js, TypeScript y Tailwind.
+Pon a dos IAs a debatir cualquier tema. Ángel vs Diablo en una arena visual de pixel art. App web construida con Next.js, TypeScript y Tailwind.
 
 ## Características
 
-- **Debate PRO vs CON**: dos agentes de IA debaten una propuesta con estructura formal.
-- **Múltiples proveedores**: OpenRouter, Google Gemini, Groq y Ollama local.
-- **Gratis y open source**: las API keys las pone el usuario usando free tiers.
-- **Intervención humana**: puedes pausar y preguntar a cualquier agente.
-- **Diseño tipo videojuego**: arena visual con animaciones y tarjetas de personaje.
-- **Sin backend propio**: todo corre en el navegador y en las API routes serverless de Next.js.
+- **Juego Ángel contra Diablo**: dos personajes pixel art debaten tu decisión; tú eliges a quién creerle.
+- **Cuatro modos de juego**:
+  - **Gratis**: sin key, con un límite diario por IP.
+  - **Conectar OpenRouter**: tu cuenta OAuth PKCE, la key no llega a nuestro servidor.
+  - **Mi key**: tu propia API key en la pestaña, opcional recordar en el dispositivo.
+  - **Con créditos**: modelos mejores usando Supabase y Mercado Pago; 1 crédito por debate.
+- **Cuentas opcionales**: Supabase con Google y enlace al correo; compra de créditos con Mercado Pago Checkout Pro.
+- **Diseño tipo videojuego**: arena visual con animaciones, tarjetas y sprites de 32×32 en pixel art.
+- **Servidor mínimo**: rutas de Next.js (App Router) en Vercel; las cuentas y el saldo viven en Supabase.
 
 ## Cómo empezar
 
@@ -18,36 +21,70 @@ Pon a dos IAs a debatir cualquier tema. App web construida con Next.js, TypeScri
    ```bash
    npm install
    ```
-3. Crea un archivo `.env.local` vacío o con variables opcionales.
+3. Crea un archivo `.env.local` vacío o con las variables que quieras (mira **Variables de entorno**).
 4. Corre en desarrollo:
    ```bash
    npm run dev
    ```
 5. Abre http://localhost:3000.
 
-## Obtener API keys gratuitas
+## Modos de juego
 
-- **OpenRouter**: https://openrouter.ai/keys (free tier, una key para muchos modelos)
-- **Google Gemini**: https://aistudio.google.com/app/apikey
-- **Groq**: https://console.groq.com/keys
-- **Ollama**: corre localmente sin key en http://localhost:11434
+### Gratis
+Sin API key. El servidor usa su `OPENROUTER_API_KEY` con modelos `:free` (lista en `lib/gratis.ts`, con respaldo si uno falla); 3 debates por día por IP y un cupo global diario. La configuración muestra cuántos te quedan hoy.
 
-## Estructura del debate
+### Conectar OpenRouter
+Conecta tu cuenta OpenRouter con OAuth PKCE en el navegador. La key solo vive en tu pestaña; nunca se envía a nuestro servidor.
 
-1. Apertura PRO
-2. Apertura CON
-3. Rondas de refutación y contraargumento (configurable, default 3)
-4. Cierre PRO
-5. Cierre CON
-6. Resumen final
+### Mi key
+Pega tu propia API key de OpenRouter, Google Gemini o Groq (Ollama local solo en desarrollo). Se guarda en la pestaña (`sessionStorage`); marca «Recordar en este dispositivo» para guardarla en `localStorage`.
+
+### Con créditos
+Solo aparece si las cuentas (Supabase) están configuradas; los créditos se compran con Mercado Pago. Entra con Google o un enlace al correo y juega con modelos de pago que pone el servidor. 1 crédito por debate, que se devuelve si los modelos fallan en mitad del debate. Modelos y costo son provisionales (`lib/creditosDebate.ts`), igual que los paquetes (`lib/paquetes.ts`).
+
+Mira **[Cuentas y créditos (docs/cuentas.md)](./docs/cuentas.md)** para la guía completa.
+
+## Variables de entorno
+
+En `.env.local` (desarrollo) o en Vercel (producción). Véase también [docs/cuentas.md](./docs/cuentas.md) para Supabase y Mercado Pago.
+
+| Variable | Para qué | ¿Obligatoria? | ¿Solo servidor? |
+| --- | --- | --- | --- |
+| `DEBATE_TOKEN_SECRET` | Firma HMAC-SHA256 de los tokens del debate (≥ 32 bytes). Generar: `openssl rand -base64 48`. En desarrollo se inventa uno temporal | En producción | Sí |
+| `OPENROUTER_API_KEY` | Key del servidor para los modos Gratis y Con créditos (y para `npm run seguridad`) | Para esos modos | Sí |
+| `UPSTASH_REDIS_REST_URL` | Redis (Upstash): límite diario del modo gratis y registro de turnos jugados | En producción, para el modo Gratis (sin él responde 503; en desarrollo usa memoria) | Sí |
+| `UPSTASH_REDIS_REST_TOKEN` | Token de Redis (Upstash) | Igual que la anterior | Sí |
+| `LIMITE_IP_DIARIO` | Debates gratis por IP y día; por defecto 3 | No | Sí |
+| `CUPO_GLOBAL_DIARIO` | Debates gratis para todos por día; por defecto 111 (1.000 llamadas de OpenRouter ÷ 9 por debate) | No | Sí |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Key pública de Cloudflare Turnstile (comprobación de persona) | En producción (sin ella no empieza ningún debate) | No |
+| `TURNSTILE_SECRET_KEY` | Key secreta de Cloudflare Turnstile | En producción | Sí |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase | Para cuentas | No |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Key pública de Supabase (login y sesión) | Para cuentas | No |
+| `SUPABASE_SECRET_KEY` | Key secreta de Supabase (mover créditos); nunca con `NEXT_PUBLIC_` | Para créditos | Sí |
+| `MERCADOPAGO_ACCESS_TOKEN` | Credenciales de Mercado Pago (usar de prueba al principio) | No | Sí |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Clave secreta de Webhooks en Mercado Pago | No | Sí |
+| `NEXT_PUBLIC_SITE_URL` | URL pública de la app (para Mercado Pago; `https://...`) | No | No |
+
+## Comandos
+
+```bash
+npm run dev          # Desarrollo en http://localhost:3000
+npm test             # Pruebas (Vitest), incluida la migración de Supabase sobre PGlite
+npm run lint         # ESLint
+npm run typecheck    # TypeScript
+npm run seguridad    # Prueba de seguridad de los personajes: 15 temas delicados (necesita OPENROUTER_API_KEY)
+```
 
 ## Stack
 
-- Next.js 16 (App Router)
-- TypeScript
-- Tailwind CSS
-- Framer Motion
-- Google Generative AI SDK
+- **Next.js 16** (App Router, API routes)
+- **TypeScript**
+- **Tailwind CSS 4**
+- **Framer Motion** (animaciones)
+- **Supabase** (auth, Postgres, créditos)
+- **Mercado Pago** (pagos, webhooks)
+- **Cloudflare Turnstile** (CAPTCHA)
+- **Upstash Redis** (límite diario)
 
 ## Licencia
 

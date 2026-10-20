@@ -14,15 +14,48 @@ Cada turno son 1 o 2 frases (unas 35 palabras) y refuta lo último que dijo el o
 
 ## Flujo de pantallas
 
-1. **Configuración** (`/`, `ConfigPanel`): tema y, por ahora, proveedor/modelo de cada personaje (otra tarea lo rehace con tres modos).
-2. **Arena** (`DebateArena`): 8 turnos (apertura, 3 cruces, última palabra) con caja de diálogo letra por letra. Tras el turno 4 la persona puede intervenir (no es una llamada extra) o seguir. Cada frase se puede marcar con un pulgar y mueve la barra de tentación.
-3. **Elección**: «¿A quién le haces caso?»; la barra sugiere (borde azul) al que va ganando.
-4. **Tarjeta** (`TarjetaDesenlace`): PNG de 1080×1350 con la decisión, el sprite ganador y un desenlace de 20 palabras; descargar, compartir o jugar otra vez.
-5. **Marcador**: puntos Ángel/Diablo guardados en `localStorage` (`lib/marcador.ts`).
+1. **Panel de cuenta** (`Cuenta`, arriba): si Supabase está configurado, muestra «Entrar» o el correo + créditos + «Comprar» / «Salir»; sin Supabase no aparece.
+2. **Configuración** (`/`, `ConfigPanel`): 
+   - Textarea: tema o propuesta (máx. 200 caracteres, `MAX_TEMA`).
+   - **Selector de modo** (radio buttons):
+     - **Gratis**: sin key, contador diario.
+     - **Conectar OpenRouter**: botón de conexión OAuth PKCE.
+     - **Mi key**: selector de proveedor (OpenRouter, Gemini, Groq, Ollama), modelo y API key por proveedor; checkbox «Recordar en este dispositivo»; botón de desconectar.
+     - **Con créditos**: solo si hay cuentas; aviso de costo (1 crédito por debate, devolución si fallan).
+   - Selector de proveedor y modelo para Ángel (PRO) y Diablo (CON) en «Mi key» o «OpenRouter» conectado.
+   - **Cloudflare Turnstile** (si está configurado).
+   - Botón «Iniciar Debate» (habilitado si tema no está vacío, Turnstile pasó, modelos estan listos según el modo).
+3. **Arena** (`DebateArena`): 8 turnos (apertura, 3 cruces, última palabra) con caja de diálogo letra por letra. Tras el turno 4 la persona puede intervenir (no es una llamada extra) o seguir. Cada frase se puede marcar con un pulgar y mueve la barra de tentación.
+4. **Elección**: «¿A quién le haces caso?»; la barra sugiere (borde azul) al que va ganando.
+5. **Tarjeta** (`TarjetaDesenlace`): PNG de 1080×1350 con la decisión, el sprite ganador y un desenlace de 20 palabras; descargar, compartir o jugar otra vez.
+6. **Marcador**: puntos Ángel/Diablo guardados en `localStorage` (`lib/marcador.ts`).
+
+## Arquitectura de los modos
+
+Cada modo define quién pone la API key y cuáles modelos se usan.
+
+| Modo | Proveedor | Key | Donde vive | Límite |
+| --- | --- | --- | --- | --- |
+| **Gratis** | OpenRouter, modelos `:free` | Servidor (`OPENROUTER_API_KEY`) | Modelos en `lib/gratis.ts` | 3 debates/IP/día y cupo global (Upstash; en desarrollo, memoria). |
+| **Conectar OpenRouter** | OpenRouter (usuario) | OAuth PKCE (navegador) | Sesión y `sessionStorage`, nunca a nuestro servidor | Sin límite. |
+| **Mi key** | Elegible: OpenRouter, Gemini, Groq, Ollama (local) | Usuario (navegador o localStorage) | Pestaña o dispositivo (localStorage si marca «Recordar») | Sin límite. |
+| **Con créditos** | OpenRouter, modelos de pago | Servidor (`OPENROUTER_API_KEY`) + Supabase | Modelos en `lib/creditosDebate.ts`; modelos: Claude Haiku / Gemini Flash para PRO, Gemini Flash / DeepSeek V4 Pro para CON (respaldos) | 1 crédito por debate; saldo en `supabase.public.saldos`. Se devuelve si fallan antes de terminar. |
+
+### Guardia de modo
+
+En `ConfigPanel`, `puedeIniciar()` (`lib/modoConfig.ts`) verifica:
+- Tema no vacío.
+- Turnstile pasado (si hay sitekey).
+- Cupo del día no agotado (Gratis).
+- Cuenta de OpenRouter conectada (Conectar OpenRouter).
+
+La sesión y el saldo de «Con créditos» los comprueba el servidor al empezar.
+
+En `POST /api/debate/start`, `guardiaCreditos` (la última guardia después de Turnstile) descuenta créditos si toca y devuelve el token firmado con el id del debate.
 
 ## Llamadas al modelo
 
-8 turnos + 1 de desenlace = **9 por debate** (`TOTAL_LLAMADAS` en `lib/debateEngine.ts`). La intervención del usuario va en el historial, no cuenta. Si el desenlace falla o pasa de ~8 s, se usa una plantilla local.
+8 turnos + 1 de desenlace = **9 por debate** (`TOTAL_LLAMADAS` en `lib/debateEngine.ts`). La intervención del usuario va en el historial, no cuenta. Si el desenlace falla o pasa de ~8 s, se usa una plantilla local. El modo determina cuáles modelos y qué key se pasan al servidor.
 
 ## Tipografías
 
@@ -83,6 +116,27 @@ Texto normal mínimo 4.5:1 (AA); bordes y elementos gráficos, 3:1.
 ## Sonido
 
 Blips de 8 bits con Web Audio (`lib/blips.ts`), uno cada pocas letras mientras habla alguien: onda corta de 50 ms con tono base de 880 Hz para el Ángel y 220 Hz para el Diablo (con variación aleatoria). El `AudioContext` se crea en el primer gesto; hay botón de silencio en la barra de la arena.
+
+## Panel de cuenta (Cuenta.tsx)
+
+Arriba de la página (si Supabase está configurado). Ciclo de vida:
+
+1. **Desconectado**: «Entra para comprar créditos y usar los modelos buenos» + botón «Entrar».
+2. **Abriendo**:
+   - Botón «Entrar con Google» (redirige a Google OAuth con `redirectTo` a `/auth/callback`).
+   - Input de correo + botón «Mandar enlace» (OTP a la bandeja, abre un link en el mismo navegador con PKCE).
+3. **Conectado**: correo + saldo en créditos (`components/Cuenta.tsx` lee `GET /api/cuenta` al montar) + botones «Comprar créditos» / «Salir».
+4. **Comprando**:
+   - Lista de paquetes (id, nombre, créditos, precio en COP desde `lib/paquetes.ts`).
+   - Click en un paquete → `POST /api/pagos/preferencia { paquete }` → redirige a Mercado Pago Checkout Pro (`init_point`).
+   - Vuelta: `GET /pagos/vuelta` (informativa) o webhook `POST /api/pagos/webhook` (acredita).
+
+Credenciales:
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (login en el navegador; el saldo se lee en `GET /api/cuenta` con la sesión de la persona y RLS).
+- `MERCADOPAGO_ACCESS_TOKEN` (servidor, crea preferencia y consulta pagos).
+- `MERCADOPAGO_WEBHOOK_SECRET` (servidor, verifica firma del webhook de Mercado Pago).
+
+Mira **[docs/cuentas.md](./docs/cuentas.md)** para esquema, RLS, movimiento de créditos, pruebas a mano y configuración de Supabase / Mercado Pago.
 
 ## Capturas de referencia
 
