@@ -40,44 +40,46 @@ export interface SavedConfig {
   proModel: string;
   conProvider: string;
   conModel: string;
-  // Keys are obfuscated, not encrypted
-  proApiKey?: string;
-  conApiKey?: string;
 }
 
-function obfuscate(text: string): string {
-  return typeof window === "undefined"
-    ? text
-    : btoa(text);
-}
-
-function deobfuscate(text: string): string {
-  return typeof window === "undefined"
-    ? text
-    : atob(text);
-}
-
-export function saveConfig(config: SavedConfig): void {
-  if (typeof window === "undefined") return;
-  const storable: SavedConfig = {
-    ...config,
-    proApiKey: config.proApiKey ? obfuscate(config.proApiKey) : undefined,
-    conApiKey: config.conApiKey ? obfuscate(config.conApiKey) : undefined,
-  };
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(storable));
-}
-
-export function getConfig(): SavedConfig | null {
+function localDelNavegador(): Storage | null {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(CONFIG_KEY);
-  if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as SavedConfig;
-    return {
-      ...parsed,
-      proApiKey: parsed.proApiKey ? deobfuscate(parsed.proApiKey) : undefined,
-      conApiKey: parsed.conApiKey ? deobfuscate(parsed.conApiKey) : undefined,
-    };
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function saveConfig(config: SavedConfig, storage: Storage | null = localDelNavegador()): void {
+  if (!storage) return;
+  const { topic, proProvider, proModel, conProvider, conModel } = config;
+  try {
+    storage.setItem(CONFIG_KEY, JSON.stringify({ topic, proProvider, proModel, conProvider, conModel }));
+  } catch {
+    // storage lleno o bloqueado: la config simplemente no se recuerda
+  }
+}
+
+// Las versiones viejas guardaban proApiKey/conApiKey en base64 dentro de la config.
+// No se migran: estaban en un sitio que la persona no eligió. Se borran y el resto se conserva.
+export function getConfig(storage: Storage | null = localDelNavegador()): SavedConfig | null {
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(CONFIG_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") return null;
+    if ("proApiKey" in parsed || "conApiKey" in parsed) {
+      delete parsed.proApiKey;
+      delete parsed.conApiKey;
+      try {
+        storage.setItem(CONFIG_KEY, JSON.stringify(parsed));
+      } catch {
+        // si no se puede reescribir, al menos no se devuelven
+      }
+    }
+    return parsed as unknown as SavedConfig;
   } catch {
     return null;
   }

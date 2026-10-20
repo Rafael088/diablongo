@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { proveedoresDisponibles, getProviderById } from "@/lib/providers";
 import { DebateConfig, DebaterConfig, ProviderConfig } from "@/types";
 import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
-import { Swords, Settings2 } from "lucide-react";
+import { Swords, Settings2, Eye, EyeOff } from "lucide-react";
+import { AVISO_RECORDAR, estaRecordada, guardarKey, leerKey, olvidarKey } from "@/lib/keys";
 import { MAX_TEMA } from "@/lib/topes";
 
 interface ConfigPanelProps {
@@ -50,11 +51,30 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
 
   const [proProvider, setProProvider] = useState(proveedorValido(saved?.proProvider, disponibles));
   const [proModelRaw, setProModel] = useState(saved?.proModel ?? porDefecto.models[0]);
-  const [proApiKey, setProApiKey] = useState(saved?.proApiKey || "");
 
   const [conProvider, setConProvider] = useState(proveedorValido(saved?.conProvider, disponibles));
   const [conModelRaw, setConModel] = useState(saved?.conModel ?? porDefecto.models[1]);
-  const [conApiKey, setConApiKey] = useState(saved?.conApiKey || "");
+
+  // Una key por proveedor (si Ángel y Diablo usan el mismo, comparten key).
+  const [keys, setKeys] = useState<Record<string, string>>(() =>
+    Object.fromEntries(disponibles.map((p) => [p.id, leerKey(p.id)]))
+  );
+  const [recordar, setRecordar] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(disponibles.map((p) => [p.id, estaRecordada(p.id)]))
+  );
+  const proApiKey = keys[proProvider] ?? "";
+  const conApiKey = keys[conProvider] ?? "";
+  const cambiarKey = (id: string, valor: string) => setKeys((k) => ({ ...k, [id]: valor }));
+  const cambiarRecordar = (id: string, valor: boolean) => {
+    setRecordar((r) => ({ ...r, [id]: valor }));
+    // Si ya hay una key escrita, el cambio de almacén se aplica al momento.
+    if (keys[id]) guardarKey(id, keys[id], { recordar: valor });
+  };
+  const desconectar = (id: string) => {
+    olvidarKey(id);
+    setKeys((k) => ({ ...k, [id]: "" }));
+    setRecordar((r) => ({ ...r, [id]: false }));
+  };
 
   const proModel = modeloValido(proProvider, proModelRaw);
   const conModel = modeloValido(conProvider, conModelRaw);
@@ -68,9 +88,12 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
       proModel,
       conProvider,
       conModel,
-      proApiKey,
-      conApiKey,
     });
+    for (const id of new Set([proProvider, conProvider])) {
+      if (getProviderById(id)?.requiresApiKey) {
+        guardarKey(id, keys[id] ?? "", { recordar: recordar[id] ?? false });
+      }
+    }
 
     const pro: DebaterConfig = {
       role: "pro",
@@ -132,9 +155,12 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
               provider={proProvider}
               model={proModel}
               apiKey={proApiKey}
+              recordar={recordar[proProvider] ?? false}
               onProviderChange={setProProvider}
               onModelChange={setProModel}
-              onApiKeyChange={setProApiKey}
+              onApiKeyChange={(v) => cambiarKey(proProvider, v)}
+              onRecordarChange={(v) => cambiarRecordar(proProvider, v)}
+              onDesconectar={() => desconectar(proProvider)}
             />
             <DebaterForm
               title="Opositor (CON)"
@@ -142,9 +168,12 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
               provider={conProvider}
               model={conModel}
               apiKey={conApiKey}
+              recordar={recordar[conProvider] ?? false}
               onProviderChange={setConProvider}
               onModelChange={setConModel}
-              onApiKeyChange={setConApiKey}
+              onApiKeyChange={(v) => cambiarKey(conProvider, v)}
+              onRecordarChange={(v) => cambiarRecordar(conProvider, v)}
+              onDesconectar={() => desconectar(conProvider)}
             />
           </div>
 
@@ -157,7 +186,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
           </button>
 
           <p className="config-nota">
-            Las API keys se guardan ofuscadas en tu navegador. Nunca se envían a ningún servidor propio.
+            Tu API key se guarda solo en esta pestaña y se borra al cerrarla, salvo que marques «Recordar en este dispositivo». Nunca se envía a ningún servidor propio.
           </p>
         </div>
       </div>
@@ -171,9 +200,12 @@ interface DebaterFormProps {
   provider: string;
   model: string;
   apiKey: string;
+  recordar: boolean;
   onProviderChange: (provider: string) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
+  onRecordarChange: (recordar: boolean) => void;
+  onDesconectar: () => void;
 }
 
 function DebaterForm({
@@ -182,11 +214,15 @@ function DebaterForm({
   provider,
   model,
   apiKey,
+  recordar,
   onProviderChange,
   onModelChange,
   onApiKeyChange,
+  onRecordarChange,
+  onDesconectar,
 }: DebaterFormProps) {
   const providerConfig = getProviderById(provider);
+  const [verKey, setVerKey] = useState(false);
 
   return (
     <div className={`config-seccion config-seccion-${color}`}>
@@ -228,13 +264,43 @@ function DebaterForm({
       {providerConfig?.requiresApiKey && (
         <div>
           <label className="config-etiqueta">API Key</label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => onApiKeyChange(e.target.value)}
-            placeholder={`Tu key de ${providerConfig.name}`}
-            className="config-campo"
-          />
+          <div className="flex gap-2">
+            <input
+              type={verKey ? "text" : "password"}
+              value={apiKey}
+              onChange={(e) => onApiKeyChange(e.target.value)}
+              placeholder={`Tu key de ${providerConfig.name}`}
+              autoComplete="off"
+              spellCheck={false}
+              className="config-campo"
+            />
+            <button
+              type="button"
+              onClick={() => setVerKey((v) => !v)}
+              aria-label={verKey ? "Ocultar la key" : "Mostrar la key"}
+              aria-pressed={verKey}
+              className="config-campo"
+              style={{ width: "auto", flexShrink: 0 }}
+            >
+              {verKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <label className="flex items-center gap-2 text-sm mt-2">
+            <input
+              type="checkbox"
+              checked={recordar}
+              onChange={(e) => onRecordarChange(e.target.checked)}
+            />
+            Recordar en este dispositivo
+          </label>
+          <p className="text-xs opacity-70 mt-1">{AVISO_RECORDAR}</p>
+          <button
+            type="button"
+            onClick={onDesconectar}
+            className="text-xs underline opacity-70 mt-2"
+          >
+            Desconectar
+          </button>
         </div>
       )}
     </div>
