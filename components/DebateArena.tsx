@@ -9,7 +9,7 @@ import { TOTAL_TURNS, canIntervene, countTurnsPlayed, getTurn } from "@/lib/deba
 import { useDebate, type DebateStatus, type GenerateTurn } from "@/hooks/useDebate";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { useSoundEnabled, setSoundEnabled } from "@/hooks/useSoundEnabled";
-import { getBaseFrequency, playBlip, shouldPlayBlip } from "@/lib/blips";
+import { blipAlAvanzar, getBaseFrequency, playBlip } from "@/lib/blips";
 import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
 import PersonajeAnimado from "./PersonajeAnimado";
 import { MINIMO, TOPE, quienGana, textoGanando, valorDeVotos, type Ganando } from "@/lib/tentacion";
@@ -64,7 +64,7 @@ export default function DebateArena({
   const { messages, status, thinking, error, textRead } = debate;
   const [interventionText, setInterventionText] = useState("");
   const soundEnabled = useSoundEnabled();
-  const prevCountRef = useRef(0);
+  const prevBlipRef = useRef({ text: "", count: 0 });
   const quieto = useReducedMotion() ?? false;
   // Votos 👍 por índice de mensaje.
   const [votos, setVotos] = useState<number[]>(votosIniciales ?? []);
@@ -85,25 +85,17 @@ export default function DebateArena({
   // Toca blips mientras se escribe (cada 2 letras).
   // Ignora espacios y puntuación, y no toca si thinking o instant.
   useEffect(() => {
-    if (!soundEnabled || thinking || instant || !last) {
-      prevCountRef.current = count;
-      return;
-    }
+    // Si la frase cambió, se cuenta desde cero; un skip salta de golpe y no suena.
+    const prev = prevBlipRef.current.text === lineText ? prevBlipRef.current.count : 0;
+    prevBlipRef.current = { text: lineText, count };
 
+    if (!soundEnabled || thinking || instant || !last) return;
     const speaker = last.role as DebateRole | "user";
+    if (speaker !== "pro" && speaker !== "con") return;
 
-    if (count > prevCountRef.current && (speaker === "pro" || speaker === "con")) {
-      const frequency = getBaseFrequency(speaker);
-
-      // Revisar cada carácter entre prevCount y count
-      for (let i = prevCountRef.current; i < count; i++) {
-        if (shouldPlayBlip(lineText, i)) {
-          playBlip(frequency, 50, 0.05);
-        }
-      }
+    if (blipAlAvanzar(lineText, prev, count)) {
+      playBlip(getBaseFrequency(speaker), 50, 0.05);
     }
-
-    prevCountRef.current = count;
   }, [count, soundEnabled, thinking, instant, last, lineText]);
 
   // Clic o tecla para completar la frase al instante.

@@ -31,6 +31,12 @@ function getBaseFrequency(speaker: "pro" | "con"): number {
   return speaker === "pro" ? 880 : 220;
 }
 
+function blipAlAvanzar(text: string, prev: number, count: number): boolean {
+  const avance = count - prev;
+  if (avance < 1 || avance > 3) return false;
+  return shouldPlayBlip(text, count - 1);
+}
+
 let testsPassed = 0;
 let testsFailed = 0;
 
@@ -115,11 +121,26 @@ function testGetBaseFrequency() {
   assert(proFreq / conFreq === 4, "Ángel es 4x más agudo que Diablo");
 }
 
+function testBlipAlAvanzar() {
+  console.log("\n=== Pruebas de blipAlAvanzar ===\n");
+  const t = "hola mundo, esto es una frase larga";
+  assert(blipAlAvanzar(t, 1, 2) === shouldPlayBlip(t, 1), "avance de 1 letra: según shouldPlayBlip (suena)");
+  assert(!blipAlAvanzar(t, 0, 1), "avance de 1 letra sin blip: no suena");
+  assert(!blipAlAvanzar(t, 3, t.length), "skip (salto grande): no suena");
+  assert(!blipAlAvanzar(t, 5, 5), "sin avance: no suena");
+  // Frase nueva: el llamador parte de prev = 0 y suena desde el principio.
+  assert(blipAlAvanzar("ab cd", 1, 2), "frase nueva: la 2ª letra suena aunque la anterior fuera larga");
+  let sonaron = 0;
+  for (let c = 1; c <= t.length; c++) if (blipAlAvanzar(t, c - 1, c)) sonaron++;
+  assert(sonaron > 0, "escribiendo letra a letra suenan blips");
+}
+
 async function main() {
   console.log("🎮 Pruebas de lógica de blips\n");
 
   testShouldPlayBlip();
   testGetBaseFrequency();
+  testBlipAlAvanzar();
 
   console.log(`\n=== Resultados ===`);
   console.log(`✓ Pasadas: ${testsPassed}`);

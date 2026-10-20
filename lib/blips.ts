@@ -22,6 +22,9 @@ export function getAudioContext(): AudioContext | null {
       return null;
     }
   }
+  if (audioContext.state === "suspended") {
+    audioContext.resume().catch(() => {});
+  }
   return audioContext;
 }
 
@@ -94,30 +97,16 @@ export function shouldPlayBlip(text: string, charIndex: number): boolean {
   return realCount % 2 === 0;
 }
 
+/** Mayor avance (en letras) que aún cuenta como escritura normal; más es un salto (skip). */
+export const MAX_AVANCE_BLIP = 3;
+
 /**
- * Hook para leer/escribir la preferencia de sonido en localStorage.
- * Envuelto en try/catch para evitar errores si localStorage no está disponible.
+ * Decide si suena un blip al pasar de `prev` a `count` letras mostradas de `text`.
+ * Suena como mucho uno (el del último carácter nuevo) y nunca en un salto grande.
+ * Si la frase es nueva, el llamador pasa prev = 0 y la primera letra puede sonar.
  */
-export function useSoundPreference(): [boolean, (enabled: boolean) => void] {
-  const getEnabled = (): boolean => {
-    if (typeof window === "undefined") return true;
-    try {
-      const stored = localStorage.getItem("sound-enabled");
-      if (stored === null) return true; // Por defecto activado
-      return stored === "true";
-    } catch {
-      return true;
-    }
-  };
-
-  const setEnabled = (enabled: boolean): void => {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem("sound-enabled", enabled ? "true" : "false");
-    } catch {
-      // Ignorar errores de localStorage
-    }
-  };
-
-  return [getEnabled(), setEnabled];
+export function blipAlAvanzar(text: string, prev: number, count: number): boolean {
+  const avance = count - prev;
+  if (avance < 1 || avance > MAX_AVANCE_BLIP) return false;
+  return shouldPlayBlip(text, count - 1);
 }

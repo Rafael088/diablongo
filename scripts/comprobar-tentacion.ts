@@ -30,9 +30,9 @@ for (let i = 0; i < 20; i++) v = aplicarVoto(v, "pro");
 ok(v === MINIMO, "tope en -100");
 
 v = 0;
-for (let i = 0; i < 8; i++) v = aplicarVoto(v, "pro");
-ok(v === MINIMO, "con 8 frases del mismo bando se llega justo al extremo");
-ok(7 * PASO < TOPE, "con 7 frases aún no se llega");
+for (let i = 0; i < 4; i++) v = aplicarVoto(v, "pro");
+ok(v === MINIMO, "con 4 votos al mismo bando se llega justo al extremo");
+ok(3 * PASO < TOPE, "con 3 votos aún no se llega");
 
 ok(quienGana(aplicarVoto(aplicarVoto(0, "pro"), "con")) === "empate", "un voto a cada lado empata");
 

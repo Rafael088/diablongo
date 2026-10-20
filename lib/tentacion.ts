@@ -8,8 +8,8 @@ export type Ganando = Bando | "empate";
 export const MINIMO = -100;
 export const TOPE = 100;
 export const VALOR_INICIAL = 0;
-/** Lo que mueve un 👍. Con 8 frases todas del mismo bando se llega justo al extremo. */
-export const PASO = 12.5;
+/** Lo que mueve un 👍. Cada personaje dice 4 frases en un debate de 8 turnos: 4 👍 al mismo bando llegan justo al extremo (±100). */
+export const PASO = 25;
 
 export function limitar(valor: number): number {
   return Math.max(MINIMO, Math.min(TOPE, valor));
