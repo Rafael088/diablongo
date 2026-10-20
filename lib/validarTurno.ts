@@ -1,6 +1,13 @@
 import { FASES } from "../types/index.ts";
 import type { DebateMessage, DebatePhase, DebateRole, ProviderConfig } from "../types/index.ts";
 import { getProviderById } from "./providers.ts";
+import {
+  MAX_INTERVENCION,
+  MAX_INTERVENCIONES_USUARIO,
+  MAX_MENSAJE_HISTORIAL,
+  MAX_MENSAJES_HISTORIAL,
+  MAX_TEMA,
+} from "./topes.ts";
 
 export interface DatosTurno {
   topic: string;
@@ -40,6 +47,9 @@ export function validarTurno(body: unknown): ResultadoValidacion {
   if (typeof topic !== "string" || topic.trim() === "") {
     return fallo("Falta el tema del debate.");
   }
+  if (topic.trim().length > MAX_TEMA) {
+    return fallo(`El tema es demasiado largo (máximo ${MAX_TEMA} caracteres).`);
+  }
   if (typeof role !== "string" || !ROLES.includes(role)) {
     return fallo("El personaje indicado no es válido.");
   }
@@ -62,6 +72,10 @@ export function validarTurno(body: unknown): ResultadoValidacion {
   let historial: DebateMessage[] = [];
   if (history !== undefined) {
     if (!Array.isArray(history)) return fallo("El historial no es válido.");
+    if (history.length > MAX_MENSAJES_HISTORIAL) {
+      return fallo(`El historial tiene demasiados mensajes (máximo ${MAX_MENSAJES_HISTORIAL}).`);
+    }
+    let delUsuario = 0;
     for (const m of history) {
       if (
         !esObjeto(m) ||
@@ -71,12 +85,22 @@ export function validarTurno(body: unknown): ResultadoValidacion {
       ) {
         return fallo("El historial contiene un mensaje no válido.");
       }
+      if (m.content.length > MAX_MENSAJE_HISTORIAL) {
+        return fallo(`Un mensaje del historial es demasiado largo (máximo ${MAX_MENSAJE_HISTORIAL} caracteres).`);
+      }
+      if (m.role === "user") delUsuario++;
+    }
+    if (delUsuario > MAX_INTERVENCIONES_USUARIO) {
+      return fallo(`El historial tiene demasiadas intervenciones (máximo ${MAX_INTERVENCIONES_USUARIO}).`);
     }
     historial = history as DebateMessage[];
   }
 
   if (intervention !== undefined && typeof intervention !== "string") {
     return fallo("La intervención no es válida.");
+  }
+  if (typeof intervention === "string" && intervention.length > MAX_INTERVENCION) {
+    return fallo(`La intervención es demasiado larga (máximo ${MAX_INTERVENCION} caracteres).`);
   }
 
   return {

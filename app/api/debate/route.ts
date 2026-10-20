@@ -3,12 +3,21 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { TurnResponse } from "@/types";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts";
 import { validarTurno } from "@/lib/validarTurno";
+import { MAX_CUERPO_BYTES, MAX_TOKENS_RESPUESTA } from "@/lib/topes";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    const texto = await request.text();
+    if (Buffer.byteLength(texto, "utf8") > MAX_CUERPO_BYTES) {
+      return NextResponse.json(
+        { error: "La petición es demasiado grande." },
+        { status: 413 }
+      );
+    }
+
     let body: unknown;
     try {
-      body = await request.json();
+      body = JSON.parse(texto);
     } catch {
       return NextResponse.json({ error: "El cuerpo de la petición no es JSON." }, { status: 400 });
     }
@@ -87,7 +96,7 @@ async function callOpenAICompatible(
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 800,
+      max_tokens: MAX_TOKENS_RESPUESTA,
     }),
   });
 
@@ -110,6 +119,7 @@ async function callGemini(
   const geminiModel = genAI.getGenerativeModel({
     model,
     systemInstruction: systemPrompt,
+    generationConfig: { maxOutputTokens: MAX_TOKENS_RESPUESTA },
   });
 
   const result = await geminiModel.generateContent(userPrompt);

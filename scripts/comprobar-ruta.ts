@@ -2,6 +2,13 @@
 // Uso: node scripts/comprobar-ruta.ts
 import { validarTurno } from "../lib/validarTurno.ts";
 import { providers } from "../lib/providers.ts";
+import {
+  MAX_INTERVENCION,
+  MAX_INTERVENCIONES_USUARIO,
+  MAX_MENSAJE_HISTORIAL,
+  MAX_MENSAJES_HISTORIAL,
+  MAX_TEMA,
+} from "../lib/topes.ts";
 
 const errores: string[] = [];
 function afirmar(cond: boolean, msg: string) {
@@ -42,6 +49,35 @@ rechaza("topic vacío", { ...base, topic: "  " });
 rechaza("intervention no string", { ...base, intervention: 3 });
 rechaza("cuerpo null", null);
 rechaza("cuerpo array", []);
+
+// Topes de largo
+const X = "x";
+rechaza("tema demasiado largo", { ...base, topic: X.repeat(MAX_TEMA + 1) });
+rechaza("tema largo solo por espacios no cuenta", { ...base, topic: " ".repeat(5) });
+rechaza("intervención demasiado larga", { ...base, intervention: X.repeat(MAX_INTERVENCION + 1) });
+rechaza("mensaje de historial demasiado largo", {
+  ...base,
+  history: [{ role: "pro", content: X.repeat(MAX_MENSAJE_HISTORIAL + 1) }],
+});
+rechaza("demasiados mensajes", {
+  ...base,
+  history: Array.from({ length: MAX_MENSAJES_HISTORIAL + 1 }, (_, i) => ({ role: i % 2 ? "pro" : "con", content: "a" })),
+});
+rechaza("demasiadas intervenciones", {
+  ...base,
+  history: Array.from({ length: MAX_INTERVENCIONES_USUARIO + 1 }, () => ({ role: "user", content: "a" })),
+});
+const mensajes = (n: number, role: string) => Array.from({ length: n }, () => ({ role, content: X.repeat(MAX_MENSAJE_HISTORIAL) }));
+afirmar(validarTurno({ ...base, topic: X.repeat(MAX_TEMA) }).ok, "tema justo en el tope debía aceptarse");
+afirmar(validarTurno({ ...base, topic: "  " + X.repeat(MAX_TEMA) + "  " }).ok, "tema con espacios en los bordes debía recortarse y aceptarse");
+afirmar(validarTurno({ ...base, intervention: X.repeat(MAX_INTERVENCION) }).ok, "intervención justa debía aceptarse");
+afirmar(
+  validarTurno({
+    ...base,
+    history: [...mensajes(MAX_MENSAJES_HISTORIAL - MAX_INTERVENCIONES_USUARIO, "pro"), ...mensajes(MAX_INTERVENCIONES_USUARIO, "user")],
+  }).ok,
+  "historial justo en los topes debía aceptarse",
+);
 
 const ok = validarTurno({ ...base, intervention: "ojo" });
 afirmar(ok.ok, "caso válido: debía aceptarse");

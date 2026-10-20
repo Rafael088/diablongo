@@ -16,6 +16,7 @@ import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
 import PersonajeAnimado from "./PersonajeAnimado";
 import { MINIMO, TOPE, quienGana, textoGanando, valorDeVotos, type Ganando } from "@/lib/tentacion";
 import TarjetaDesenlace from "./TarjetaDesenlace";
+import { MAX_INTERVENCION } from "@/lib/topes";
 
 interface DebateArenaProps {
   config: DebateConfig;
@@ -377,8 +378,12 @@ export default function DebateArena({
               onKeyDown={(e) => e.key === "Enter" && decir()}
               placeholder="Escribe tu mensaje..."
               aria-label="Tu mensaje para el Ángel y el Diablo"
+              maxLength={MAX_INTERVENCION}
               className="caja-campo"
             />
+            <p className="text-xs opacity-60 text-right">
+              {interventionText.length}/{MAX_INTERVENCION}
+            </p>
             <div className="caja-botones">
               <button className="caja-boton" onClick={decir} disabled={!interventionText.trim()}>
                 Decir

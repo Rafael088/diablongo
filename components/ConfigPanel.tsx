@@ -6,6 +6,7 @@ import { providers, getProviderById } from "@/lib/providers";
 import { DebateConfig, DebaterConfig } from "@/types";
 import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
 import { Swords, Settings2 } from "lucide-react";
+import { MAX_TEMA } from "@/lib/topes";
 
 interface ConfigPanelProps {
   onStart: (config: DebateConfig) => void;
@@ -38,7 +39,7 @@ function modeloValido(providerId: string, model: string): string {
 }
 
 function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig | null }) {
-  const [topic, setTopic] = useState(saved?.topic ?? "");
+  const [topic, setTopic] = useState((saved?.topic ?? "").slice(0, MAX_TEMA));
 
   const [proProvider, setProProvider] = useState(saved?.proProvider ?? "openrouter");
   const [proModelRaw, setProModel] = useState(saved?.proModel ?? providers[0].models[0]);
@@ -109,8 +110,12 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="¿Deberíamos migrar nuestra base de datos a PostgreSQL?"
+              maxLength={MAX_TEMA}
               className="config-campo h-24 resize-none"
             />
+            <p className="text-xs opacity-60 text-right mt-1" aria-live="off">
+              {topic.length}/{MAX_TEMA}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
