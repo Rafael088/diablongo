@@ -12,7 +12,7 @@ Pon a dos IAs a debatir cualquier tema. Ángel vs Diablo en una arena visual de 
   - **Con créditos**: modelos mejores usando Supabase y Mercado Pago; 1 crédito por debate.
 - **Cuentas opcionales**: Supabase con Google y enlace al correo; compra de créditos con Mercado Pago Checkout Pro.
 - **Diseño tipo videojuego**: arena visual con animaciones, tarjetas y sprites de 32×32 en pixel art.
-- **Sin backend propio**: todo en Next.js App Router, API routes serverless y Supabase sin servidor.
+- **Servidor mínimo**: rutas de Next.js (App Router) en Vercel; las cuentas y el saldo viven en Supabase.
 
 ## Cómo empezar
 
@@ -31,16 +31,16 @@ Pon a dos IAs a debatir cualquier tema. Ángel vs Diablo en una arena visual de 
 ## Modos de juego
 
 ### Gratis
-Sin API key. El servidor corre los modelos del free tier de OpenRouter; 1 debate por día por IP.
+Sin API key. El servidor usa su `OPENROUTER_API_KEY` con modelos `:free` (lista en `lib/gratis.ts`, con respaldo si uno falla); 3 debates por día por IP y un cupo global diario. La configuración muestra cuántos te quedan hoy.
 
 ### Conectar OpenRouter
 Conecta tu cuenta OpenRouter con OAuth PKCE en el navegador. La key solo vive en tu pestaña; nunca se envía a nuestro servidor.
 
 ### Mi key
-Pega tu propia API key de OpenRouter, Google Gemini, Groq u Ollama (local). Marca «Recordar en este dispositivo» para guardarla en `localStorage`.
+Pega tu propia API key de OpenRouter, Google Gemini o Groq (Ollama local solo en desarrollo). Se guarda en la pestaña (`sessionStorage`); marca «Recordar en este dispositivo» para guardarla en `localStorage`.
 
 ### Con créditos
-Solo si configuras Supabase y Mercado Pago. Entra con Google o un enlace al correo, compra créditos y juega con Claude Haiku / Gemini Flash. 1 crédito por debate; se devuelve si los modelos fallan.
+Solo aparece si las cuentas (Supabase) están configuradas; los créditos se compran con Mercado Pago. Entra con Google o un enlace al correo y juega con modelos de pago que pone el servidor. 1 crédito por debate, que se devuelve si los modelos fallan en mitad del debate. Modelos y costo son provisionales (`lib/creditosDebate.ts`), igual que los paquetes (`lib/paquetes.ts`).
 
 Mira **[Cuentas y créditos (docs/cuentas.md)](./docs/cuentas.md)** para la guía completa.
 
@@ -50,17 +50,17 @@ En `.env.local` (desarrollo) o en Vercel (producción). Véase también [docs/cu
 
 | Variable | Para qué | ¿Obligatoria? | ¿Solo servidor? |
 | --- | --- | --- | --- |
-| `DEBATE_TOKEN_SECRET` | Firma HMAC-SHA256 de los tokens del debate. Generar: `openssl rand -base64 48` | En producción | Sí |
-| `OPENROUTER_API_KEY` | Key del servidor para el modo Gratis y Con créditos | No | Sí |
-| `UPSTASH_REDIS_REST_URL` | Endpoint de Redis (Upstash) para el contador diario | No | Sí |
-| `UPSTASH_REDIS_REST_TOKEN` | Token de Redis (Upstash) | No | Sí |
-| `LIMITE_IP_DIARIO` | Debates libres por IP y día; default 1 | No | Sí |
-| `CUPO_GLOBAL_DIARIO` | Debates gratis totales por día (fallback si Redis no anda); default ilimitado | No | Sí |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Key pública de Cloudflare Turnstile (CAPTCHA) | No | No |
-| `TURNSTILE_SECRET_KEY` | Key secreta de Cloudflare Turnstile | No | Sí |
-| `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase | No | No |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Key pública de Supabase (lectura de saldo) | No | No |
-| `SUPABASE_SECRET_KEY` | Key secreta de Supabase (mover créditos); nunca con `NEXT_PUBLIC_` | No | Sí |
+| `DEBATE_TOKEN_SECRET` | Firma HMAC-SHA256 de los tokens del debate (≥ 32 bytes). Generar: `openssl rand -base64 48`. En desarrollo se inventa uno temporal | En producción | Sí |
+| `OPENROUTER_API_KEY` | Key del servidor para los modos Gratis y Con créditos (y para `npm run seguridad`) | Para esos modos | Sí |
+| `UPSTASH_REDIS_REST_URL` | Redis (Upstash): límite diario del modo gratis y registro de turnos jugados | En producción, para el modo Gratis (sin él responde 503; en desarrollo usa memoria) | Sí |
+| `UPSTASH_REDIS_REST_TOKEN` | Token de Redis (Upstash) | Igual que la anterior | Sí |
+| `LIMITE_IP_DIARIO` | Debates gratis por IP y día; por defecto 3 | No | Sí |
+| `CUPO_GLOBAL_DIARIO` | Debates gratis para todos por día; por defecto 111 (1.000 llamadas de OpenRouter ÷ 9 por debate) | No | Sí |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Key pública de Cloudflare Turnstile (comprobación de persona) | En producción (sin ella no empieza ningún debate) | No |
+| `TURNSTILE_SECRET_KEY` | Key secreta de Cloudflare Turnstile | En producción | Sí |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase | Para cuentas | No |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Key pública de Supabase (login y sesión) | Para cuentas | No |
+| `SUPABASE_SECRET_KEY` | Key secreta de Supabase (mover créditos); nunca con `NEXT_PUBLIC_` | Para créditos | Sí |
 | `MERCADOPAGO_ACCESS_TOKEN` | Credenciales de Mercado Pago (usar de prueba al principio) | No | Sí |
 | `MERCADOPAGO_WEBHOOK_SECRET` | Clave secreta de Webhooks en Mercado Pago | No | Sí |
 | `NEXT_PUBLIC_SITE_URL` | URL pública de la app (para Mercado Pago; `https://...`) | No | No |
@@ -69,10 +69,10 @@ En `.env.local` (desarrollo) o en Vercel (producción). Véase también [docs/cu
 
 ```bash
 npm run dev          # Desarrollo en http://localhost:3000
-npm test             # Pruebas unitarias (Vitest) — migración de Supabase en PGlite
+npm test             # Pruebas (Vitest), incluida la migración de Supabase sobre PGlite
 npm run lint         # ESLint
 npm run typecheck    # TypeScript
-npm run seguridad    # Auditoría de seguridad (Node.js, npm, custom)
+npm run seguridad    # Prueba de seguridad de los personajes: 15 temas delicados (necesita OPENROUTER_API_KEY)
 ```
 
 ## Stack

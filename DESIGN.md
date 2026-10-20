@@ -16,7 +16,7 @@ Cada turno son 1 o 2 frases (unas 35 palabras) y refuta lo último que dijo el o
 
 1. **Panel de cuenta** (`Cuenta`, arriba): si Supabase está configurado, muestra «Entrar» o el correo + créditos + «Comprar» / «Salir»; sin Supabase no aparece.
 2. **Configuración** (`/`, `ConfigPanel`): 
-   - Textarea: tema o propuesta (máx 1000 caracteres).
+   - Textarea: tema o propuesta (máx. 200 caracteres, `MAX_TEMA`).
    - **Selector de modo** (radio buttons):
      - **Gratis**: sin key, contador diario.
      - **Conectar OpenRouter**: botón de conexión OAuth PKCE.
@@ -36,20 +36,20 @@ Cada modo define quién pone la API key y cuáles modelos se usan.
 
 | Modo | Proveedor | Key | Donde vive | Límite |
 | --- | --- | --- | --- | --- |
-| **Gratis** | OpenRouter free tier | Servidor (`OPENROUTER_API_KEY`) | `lib/modoConfig.ts` | 1 debate/IP/día (Redis o fallback). Sin TURNSTILE puede ser ilimitado en desarrollo. |
+| **Gratis** | OpenRouter, modelos `:free` | Servidor (`OPENROUTER_API_KEY`) | Modelos en `lib/gratis.ts` | 3 debates/IP/día y cupo global (Upstash; en desarrollo, memoria). |
 | **Conectar OpenRouter** | OpenRouter (usuario) | OAuth PKCE (navegador) | Sesión y `sessionStorage`, nunca a nuestro servidor | Sin límite. |
 | **Mi key** | Elegible: OpenRouter, Gemini, Groq, Ollama (local) | Usuario (navegador o localStorage) | Pestaña o dispositivo (localStorage si marca «Recordar») | Sin límite. |
-| **Con créditos** | OpenRouter good tier | Servidor (`OPENROUTER_API_KEY`) + Supabase | Modelos en `lib/creditosDebate.ts`; modelos: Claude Haiku / Gemini Flash para PRO, Gemini Flash / DeepSeek V4 Pro para CON (respaldos) | 1 crédito por debate; saldo en `supabase.public.saldos`. Se devuelve si fallan antes de terminar. |
+| **Con créditos** | OpenRouter, modelos de pago | Servidor (`OPENROUTER_API_KEY`) + Supabase | Modelos en `lib/creditosDebate.ts`; modelos: Claude Haiku / Gemini Flash para PRO, Gemini Flash / DeepSeek V4 Pro para CON (respaldos) | 1 crédito por debate; saldo en `supabase.public.saldos`. Se devuelve si fallan antes de terminar. |
 
 ### Guardia de modo
 
-En `ConfigPanel`, `puedeIniciar()` verifica:
+En `ConfigPanel`, `puedeIniciar()` (`lib/modoConfig.ts`) verifica:
 - Tema no vacío.
-- Modo elegido.
 - Turnstile pasado (si hay sitekey).
-- Contador diario (Gratis).
-- Keys presentes (Mi key, Conectar OpenRouter).
-- Sesión y saldo (Con créditos).
+- Cupo del día no agotado (Gratis).
+- Cuenta de OpenRouter conectada (Conectar OpenRouter).
+
+La sesión y el saldo de «Con créditos» los comprueba el servidor al empezar.
 
 En `POST /api/debate/start`, `guardiaCreditos` (la última guardia después de Turnstile) descuenta créditos si toca y devuelve el token firmado con el id del debate.
 
@@ -132,7 +132,7 @@ Arriba de la página (si Supabase está configurado). Ciclo de vida:
    - Vuelta: `GET /pagos/vuelta` (informativa) o webhook `POST /api/pagos/webhook` (acredita).
 
 Credenciales:
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (lectura de saldo desde el navegador con RLS).
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (login en el navegador; el saldo se lee en `GET /api/cuenta` con la sesión de la persona y RLS).
 - `MERCADOPAGO_ACCESS_TOKEN` (servidor, crea preferencia y consulta pagos).
 - `MERCADOPAGO_WEBHOOK_SECRET` (servidor, verifica firma del webhook de Mercado Pago).
 
