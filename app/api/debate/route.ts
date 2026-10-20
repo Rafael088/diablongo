@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { TurnResponse } from "@/types";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts";
-import { validarTurno } from "@/lib/validarTurno";
+import { esObjeto, validarTurno } from "@/lib/validarTurno";
 import { MENSAJE_GRATIS_NO_DISPONIBLE, PROVEEDOR_GRATIS, elegirModeloGratis } from "@/lib/gratis";
 import { MAX_CUERPO_BYTES, MAX_TOKENS_RESPUESTA } from "@/lib/topes";
+import { MENSAJE_SIN_SECRETO, comprobarTurno, obtenerSecreto, verificarToken } from "@/lib/tokenDebate";
+import { obtenerRegistroTurnos } from "@/lib/registroTurnos";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -23,6 +25,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "El cuerpo de la petición no es JSON." }, { status: 400 });
     }
 
+    if (!esObjeto(body)) {
+      return NextResponse.json({ error: "El cuerpo de la petición no es válido." }, { status: 400 });
+    }
+    // Token del debate (emitido por /api/debate/start): sin él no se juega ningún turno.
+    const secreto = obtenerSecreto();
+    if (!secreto) {
+      return NextResponse.json({ error: MENSAJE_SIN_SECRETO }, { status: 503 });
+    }
+    const cuerpo = body;
+    const permiso = verificarToken(cuerpo.token, secreto);
+    if (!permiso.ok) {
+      return NextResponse.json({ error: permiso.error }, { status: 401 });
+    }
+
     const validacion = validarTurno(body);
     if (!validacion.ok) {
       return NextResponse.json({ error: validacion.error }, { status: validacion.status });
@@ -30,6 +46,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { topic, role, phase, provider, history, intervention } = validacion.datos;
     let { model, apiKey } = validacion.datos;
     const providerId = provider.id;
+
+    // El turno tiene que caber en el plan del debate y ser del mismo tema/proveedor/modelo.
+    const turno = comprobarTurno(
+      permiso.payload,
+      secreto,
+      { topic, role, phase, provider: providerId, model },
+      cuerpo.indice
+    );
+    if (!turno.ok) {
+      return NextResponse.json({ error: turno.error }, { status: turno.status });
+    }
 
     // Modo gratis: key y modelo los pone el servidor. Sin key, 503 y no se llama a nada.
     if (providerId === PROVEEDOR_GRATIS) {
@@ -42,32 +69,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       model = modeloGratis;
     }
 
+    if (!["gemini", "openrouter", PROVEEDOR_GRATIS, "groq", "ollama"].includes(providerId)) {
+      return NextResponse.json({ error: "Provider not implemented" }, { status: 501 });
+    }
+
+    // Último paso antes de gastar: el índice se consume una sola vez (409 si se repite).
+    const registro = obtenerRegistroTurnos();
+    const debateId = permiso.payload.id;
+    if (!(await registro.marcar(debateId, turno.indice, permiso.payload.exp))) {
+      return NextResponse.json({ error: "Ese turno del debate ya se jugó." }, { status: 409 });
+    }
+
     const systemPrompt = buildSystemPrompt(role);
     const userPrompt = buildUserPrompt(topic, role, phase, history, intervention);
 
     let content: string;
-
-    switch (providerId) {
-      case "gemini":
-        content = await callGemini(model, apiKey, systemPrompt, userPrompt);
-        break;
-      case "openrouter":
-      case PROVEEDOR_GRATIS:
-      case "groq":
-      case "ollama":
-        content = await callOpenAICompatible(
-          provider.baseUrl!,
-          model,
-          apiKey,
-          systemPrompt,
-          userPrompt
-        );
-        break;
-      default:
-        return NextResponse.json(
-          { error: "Provider not implemented" },
-          { status: 501 }
-        );
+    try {
+      content =
+        providerId === "gemini"
+          ? await callGemini(model, apiKey, systemPrompt, userPrompt)
+          : await callOpenAICompatible(provider.baseUrl!, model, apiKey, systemPrompt, userPrompt);
+    } catch (error) {
+      // Sin respuesta del proveedor: el turno se devuelve para poder reintentarlo.
+      await registro.liberar(debateId, turno.indice);
+      throw error;
     }
 
     const response: TurnResponse = { content };

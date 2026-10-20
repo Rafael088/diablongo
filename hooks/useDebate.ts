@@ -57,6 +57,8 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   const runNextTurnRef = useRef<() => void>(() => {});
   const textDoneRef = useRef(true);
   const readGateRef = useRef<(() => void) | null>(null);
+  // Token del debate (de /api/debate/start). Solo en memoria: nunca en storage.
+  const tokenRef = useRef<string | null>(null);
 
   // El estado y su ref cambian siempre juntos (los refs no se tocan al renderizar).
   const updateStatus = useCallback((next: DebateStatus) => {
@@ -80,8 +82,28 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
     []
   );
 
+  /** Pide el token del debate la primera vez; si /start falla, lanza su mensaje. */
+  const asegurarToken = useCallback(async (): Promise<string> => {
+    if (tokenRef.current) return tokenRef.current;
+    const response = await fetch("/api/debate/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: config.topic,
+        pro: { provider: config.pro.provider, model: config.pro.model },
+        con: { provider: config.con.provider, model: config.con.model },
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || typeof data.token !== "string") {
+      throw new Error(data.error || `Error ${response.status}`);
+    }
+    tokenRef.current = data.token;
+    return data.token;
+  }, [config]);
+
   const executeTurn = useCallback(
-    async (speaker: DebateRole, phase: string, round: number): Promise<boolean> => {
+    async (speaker: DebateRole, phase: string, round: number, indice: number): Promise<boolean> => {
       const debater = speaker === "pro" ? config.pro : config.con;
       setThinking(true);
       setError(null);
@@ -99,10 +121,13 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
             intervention,
           });
         } else {
+          const token = await asegurarToken();
           const response = await fetch("/api/debate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              token,
+              indice,
               topic: config.topic,
               role: speaker,
               phase,
@@ -115,7 +140,9 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
           });
 
           if (!response.ok) {
-            const data = await response.json();
+            // Permiso caducado o inválido: al reanudar se pide uno nuevo.
+            if (response.status === 401) tokenRef.current = null;
+            const data = await response.json().catch(() => ({}));
             throw new Error(data.error || `Error ${response.status}`);
           }
 
@@ -144,7 +171,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
         return false;
       }
     },
-    [config, generate, updateStatus]
+    [asegurarToken, config, generate, updateStatus]
   );
 
   const runNextTurn = useCallback(async () => {
@@ -160,7 +187,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
 
     // La intervención ya está en el historial y executeTurn la manda a este
     // personaje si aún no la contestó: no suma llamadas.
-    const success = await executeTurn(turn.nextSpeaker, turn.phase, turn.round);
+    const success = await executeTurn(turn.nextSpeaker, turn.phase, turn.round, turn.index);
 
     if (!success) {
       pendingRef.current = false;
@@ -237,6 +264,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   const stop = useCallback(() => {
     pendingRef.current = false;
     statusRef.current = "idle";
+    tokenRef.current = null;
   }, []);
 
   /**
@@ -262,11 +290,15 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
               history: messagesRef.current,
             });
           }
+          const token = tokenRef.current;
+          if (!token) throw new Error("sin token");
           const response = await fetch("/api/debate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: control.signal,
             body: JSON.stringify({
+              token,
+              indice: TOTAL_TURNS,
               topic: config.topic,
               role: elegido,
               phase: "desenlace",

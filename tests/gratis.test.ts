@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { POST } from "@/app/api/debate/route";
 import { MODELOS_GRATIS, MENSAJE_GRATIS_NO_DISPONIBLE, PROVEEDOR_GRATIS } from "@/lib/gratis";
 import { providers } from "@/lib/providers";
+import { SECRETO_PRUEBA, conToken } from "./ayudaToken";
 
 const fetchMock = vi.fn();
 const KEY_SERVIDOR = "sk-or-servidor-secreta-123";
@@ -17,9 +18,9 @@ const base = {
   history: [],
 };
 
-async function llamar(cuerpo: unknown) {
+async function llamar(cuerpo: Record<string, unknown>) {
   const res = await POST(
-    new NextRequest("http://localhost/api/debate", { method: "POST", body: JSON.stringify(cuerpo) })
+    new NextRequest("http://localhost/api/debate", { method: "POST", body: JSON.stringify(conToken(cuerpo)) })
   );
   return { status: res.status, texto: await res.text() };
 }
@@ -41,6 +42,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   vi.stubEnv("NODE_ENV", "test");
   vi.stubEnv("OPENROUTER_API_KEY", KEY_SERVIDOR);
+  vi.stubEnv("DEBATE_TOKEN_SECRET", SECRETO_PRUEBA);
 });
 
 afterEach(() => {
