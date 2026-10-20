@@ -1,4 +1,5 @@
 // Ayuda de pruebas: firma tokens de debate como lo haría /api/debate/start.
+import { vi } from "vitest";
 import { TOTAL_TURNS, TURN_PLAN } from "@/lib/debateEngine";
 import { PROVEEDOR_GRATIS } from "@/lib/gratis";
 import { emitirToken } from "@/lib/tokenDebate";
@@ -21,4 +22,15 @@ export function conToken(cuerpo: Record<string, unknown>): Record<string, unknow
     Buffer.from(SECRETO_PRUEBA)
   );
   return { token, indice: indiceDe(cuerpo.role, cuerpo.phase), ...cuerpo };
+}
+
+/** Token de Turnstile que usan las pruebas de /start (el fetch de siteverify va simulado). */
+export const TURNSTILE_PRUEBA = "token-turnstile-de-prueba";
+
+/** Simula siteverify con éxito y la acción correcta; deja el resto de fetch como esté. Devuelve el mock. */
+export function simularTurnstile(respuesta: Record<string, unknown> = { success: true, action: "iniciar-debate" }) {
+  vi.stubEnv("TURNSTILE_SECRET_KEY", "secreto-turnstile-de-prueba");
+  const mock = vi.fn(async () => new Response(JSON.stringify(respuesta), { status: 200 }));
+  vi.stubGlobal("fetch", mock);
+  return mock;
 }

@@ -21,6 +21,8 @@ import { MAX_INTERVENCION } from "@/lib/topes";
 interface DebateArenaProps {
   config: DebateConfig;
   onReset: () => void;
+  /** Token de Turnstile para /api/debate/start (un solo uso). */
+  turnstile?: string;
   /** Modo demo: texto fijo en lugar de llamar al servidor. */
   generate?: GenerateTurn;
   initialMessages?: DebateMessage[];
@@ -58,6 +60,7 @@ const PERSONAJE: Record<DebateRole | "user", PersonajeSprite> = {
 export default function DebateArena({
   config,
   onReset,
+  turnstile,
   generate,
   initialMessages,
   initialStatus,
@@ -71,7 +74,7 @@ export default function DebateArena({
   desenlaceInicial,
   volcadoTarjeta = false,
 }: DebateArenaProps) {
-  const debate = useDebate(config, { generate, initialMessages, initialStatus, persist });
+  const debate = useDebate(config, { generate, initialMessages, initialStatus, persist, turnstile });
   const { messages, status, thinking, error, textRead } = debate;
   const [interventionText, setInterventionText] = useState("");
   const soundEnabled = useSoundEnabled();

@@ -9,10 +9,16 @@ import { Swords, Settings2, Eye, EyeOff } from "lucide-react";
 import { AVISO_RECORDAR, estaRecordada, guardarKey, leerKey, olvidarKey } from "@/lib/keys";
 import { MAX_TEMA } from "@/lib/topes";
 import { PROVEEDOR_GRATIS } from "@/lib/gratis";
+import TurnstileWidget from "./TurnstileWidget";
 
 interface ConfigPanelProps {
-  onStart: (config: DebateConfig) => void;
+  /** `turnstile` es el token de Cloudflare (de un solo uso); falta solo en desarrollo sin sitekey. */
+  onStart: (config: DebateConfig, turnstile?: string) => void;
 }
+
+const SITEKEY_TURNSTILE = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+// Sin sitekey solo se puede empezar en desarrollo (el servidor también omite la verificación ahí).
+const OMITIR_TURNSTILE = !SITEKEY_TURNSTILE && process.env.NODE_ENV === "development";
 
 const subscribeVacio = () => () => {};
 
@@ -85,11 +91,14 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
     setRecordar((r) => ({ ...r, [id]: false }));
   };
 
+  const [tokenTurnstile, setTokenTurnstile] = useState<string | null>(null);
+  const verificado = OMITIR_TURNSTILE || tokenTurnstile !== null;
+
   const proModel = modeloValido(proProvider, proModelRaw);
   const conModel = modeloValido(conProvider, conModelRaw);
 
   const handleStart = () => {
-    if (!topic.trim()) return;
+    if (!topic.trim() || !verificado) return;
 
     saveConfig({
       topic,
@@ -120,7 +129,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
       name: "CON",
     };
 
-    onStart({ topic: topic.trim(), pro, con });
+    onStart({ topic: topic.trim(), pro, con }, tokenTurnstile ?? undefined);
   };
 
   return (
@@ -186,9 +195,19 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
             />
           </div>
 
+          {SITEKEY_TURNSTILE ? (
+            <TurnstileWidget sitekey={SITEKEY_TURNSTILE} onToken={setTokenTurnstile} />
+          ) : (
+            !OMITIR_TURNSTILE && (
+              <p role="alert" className="text-sm">
+                El servidor no está bien configurado: falta la comprobación de seguridad.
+              </p>
+            )
+          )}
+
           <button
             onClick={handleStart}
-            disabled={!topic.trim()}
+            disabled={!topic.trim() || !verificado}
             className="config-iniciar"
           >
             Iniciar Debate

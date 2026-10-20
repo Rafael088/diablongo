@@ -18,7 +18,7 @@ import {
   type ConfigInicio,
   type PayloadToken,
 } from "@/lib/tokenDebate";
-import { SECRETO_PRUEBA } from "./ayudaToken";
+import { SECRETO_PRUEBA, TURNSTILE_PRUEBA, simularTurnstile } from "./ayudaToken";
 
 const secreto = Buffer.from(SECRETO_PRUEBA);
 const modelo = providers.find((p) => p.id === "openrouter")!.models[0];
@@ -35,7 +35,7 @@ function partes(token: string) {
 }
 
 async function start(cuerpo: unknown) {
-  const body = typeof cuerpo === "string" ? cuerpo : JSON.stringify(cuerpo);
+  const body = typeof cuerpo === "string" ? cuerpo : JSON.stringify({ turnstile: TURNSTILE_PRUEBA, ...(cuerpo as object) });
   const res = await START(new NextRequest("http://localhost/api/debate/start", { method: "POST", body }));
   return { status: res.status, texto: await res.text() };
 }
@@ -43,11 +43,13 @@ async function start(cuerpo: unknown) {
 beforeEach(() => {
   vi.stubEnv("NODE_ENV", "test");
   vi.stubEnv("DEBATE_TOKEN_SECRET", SECRETO_PRUEBA);
+  simularTurnstile();
 });
 
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   GUARDIAS_INICIO.length = 0;
 });

@@ -238,9 +238,18 @@ const configDebate = {
 };
 
 async function empezar(config: unknown = configDebate): Promise<string> {
-  const res = await START(
-    new NextRequest("http://localhost/api/debate/start", { method: "POST", body: JSON.stringify(config) })
-  );
+  // siteverify va aparte: el fetchMock de los proveedores no debe ver esa llamada.
+  vi.stubEnv("TURNSTILE_SECRET_KEY", "secreto-turnstile-de-prueba");
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ success: true, action: "iniciar-debate" }))));
+  const cuerpo = { turnstile: "token-turnstile-de-prueba", ...(config as object) };
+  let res: Response;
+  try {
+    res = await START(
+      new NextRequest("http://localhost/api/debate/start", { method: "POST", body: JSON.stringify(cuerpo) })
+    );
+  } finally {
+    vi.stubGlobal("fetch", fetchMock);
+  }
   expect(res.status).toBe(200);
   return ((await res.json()) as { token: string }).token;
 }

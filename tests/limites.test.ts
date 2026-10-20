@@ -7,19 +7,21 @@ import { AlmacenMemoria, usarAlmacen } from "@/lib/almacen";
 import { MENSAJE_CUPO_GLOBAL, MENSAJE_LIMITE_IP, CUPO_GLOBAL_POR_DEFECTO, fechaBogota, reinicioBogota } from "@/lib/limites";
 import { RegistroTurnosUpstash } from "@/lib/registroTurnos";
 import { providers } from "@/lib/providers";
-import { SECRETO_PRUEBA } from "./ayudaToken";
+import { SECRETO_PRUEBA, TURNSTILE_PRUEBA, simularTurnstile } from "./ayudaToken";
 
 let almacen: AlmacenMemoria;
 
 beforeEach(() => {
   vi.stubEnv("DEBATE_TOKEN_SECRET", SECRETO_PRUEBA);
   vi.stubEnv("OPENROUTER_API_KEY", "sk-x");
+  simularTurnstile();
   almacen = new AlmacenMemoria();
   usarAlmacen(almacen);
 });
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   usarAlmacen(undefined);
 });
 
@@ -33,7 +35,7 @@ function start(ip: string | null, modo = gratis) {
     new NextRequest("http://localhost/api/debate/start", {
       method: "POST",
       headers,
-      body: JSON.stringify({ topic: "¿Gatos o perros?", pro: modo, con: modo }),
+      body: JSON.stringify({ turnstile: TURNSTILE_PRUEBA, topic: "¿Gatos o perros?", pro: modo, con: modo }),
     })
   );
 }

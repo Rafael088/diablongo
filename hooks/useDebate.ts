@@ -38,6 +38,8 @@ interface UseDebateOptions {
   initialStatus?: DebateStatus;
   /** Si es false no se guarda el debate al terminar. */
   persist?: boolean;
+  /** Token de Turnstile (de un solo uso) para /api/debate/start. */
+  turnstile?: string;
 }
 
 /**
@@ -45,7 +47,7 @@ interface UseDebateOptions {
  * pantalla avisa con `textRead()` de que el texto actual se terminó de escribir.
  */
 export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) {
-  const { generate, initialMessages, initialStatus = "idle", persist = true } = options;
+  const { generate, initialMessages, initialStatus = "idle", persist = true, turnstile } = options;
   const [messages, setMessages] = useState<DebateMessage[]>(initialMessages ?? []);
   const [status, setStatus] = useState<DebateStatus>(initialStatus);
   const [thinking, setThinking] = useState(false);
@@ -59,6 +61,8 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   const readGateRef = useRef<(() => void) | null>(null);
   // Token del debate (de /api/debate/start). Solo en memoria: nunca en storage.
   const tokenRef = useRef<string | null>(null);
+  // Token de Turnstile: se usa una sola vez; si /start lo gasta, no se reenvía.
+  const turnstileRef = useRef<string | undefined>(turnstile);
 
   // El estado y su ref cambian siempre juntos (los refs no se tocan al renderizar).
   const updateStatus = useCallback((next: DebateStatus) => {
@@ -85,6 +89,8 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   /** Pide el token del debate la primera vez; si /start falla, lanza su mensaje. */
   const asegurarToken = useCallback(async (): Promise<string> => {
     if (tokenRef.current) return tokenRef.current;
+    const verificacion = turnstileRef.current;
+    turnstileRef.current = undefined;
     const response = await fetch("/api/debate/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -92,6 +98,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
         topic: config.topic,
         pro: { provider: config.pro.provider, model: config.pro.model },
         con: { provider: config.con.provider, model: config.con.model },
+        turnstile: verificacion,
       }),
     });
     const data = await response.json().catch(() => ({}));
