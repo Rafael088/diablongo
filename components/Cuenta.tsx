@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { clienteNavegador } from "@/lib/supabase/navegador";
+import { PAQUETES, textoPrecio } from "@/lib/paquetes";
 import { correoValido, estadoDeCuenta, textoCreditos, urlVueltaLogin, type EstadoCuenta } from "@/lib/cuenta";
 
 type Paso = "cerrado" | "abierto" | "enviando" | "enviado";
@@ -15,6 +16,8 @@ export default function Cuenta() {
   const [correo, setCorreo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [recarga, setRecarga] = useState(0);
+  const [comprando, setComprando] = useState(false);
+  const [pagando, setPagando] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -64,6 +67,27 @@ export default function Cuenta() {
     }
   };
 
+  const comprar = async (paquete: string) => {
+    setError(null);
+    setPagando(paquete);
+    try {
+      const r = await fetch("/api/pagos/preferencia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paquete }),
+      });
+      const cuerpo = (await r.json().catch(() => null)) as { url?: unknown; error?: unknown } | null;
+      if (r.ok && typeof cuerpo?.url === "string") {
+        window.location.assign(cuerpo.url);
+        return;
+      }
+      setError(typeof cuerpo?.error === "string" ? cuerpo.error : "No pudimos iniciar el pago. Vuelve a intentarlo.");
+    } catch {
+      setError("No pudimos iniciar el pago. Revisa tu conexión y vuelve a intentarlo.");
+    }
+    setPagando(null);
+  };
+
   const salir = async () => {
     await supabase.auth.signOut();
     setPaso("cerrado");
@@ -78,9 +102,14 @@ export default function Cuenta() {
             <span>
               {estado.usuario.email} · <strong>{textoCreditos(estado.usuario.creditos)}</strong>
             </span>
-            <button type="button" className="underline" onClick={salir}>
-              Salir
-            </button>
+            <span className="flex gap-4">
+              <button type="button" className="underline" onClick={() => setComprando((v) => !v)} aria-expanded={comprando}>
+                Comprar créditos
+              </button>
+              <button type="button" className="underline" onClick={salir}>
+                Salir
+              </button>
+            </span>
           </>
         ) : paso === "cerrado" ? (
           <>
@@ -119,6 +148,20 @@ export default function Cuenta() {
           </div>
         )}
       </div>
+      {estado.usuario && comprando && (
+        <ul className="flex flex-wrap gap-3 mt-3" aria-label="Paquetes de créditos">
+          {PAQUETES.map((p) => (
+            <li key={p.id}>
+              <button type="button" className="config-modo" disabled={pagando !== null} onClick={() => comprar(p.id)}>
+                <span className="config-modo-titulo">
+                  {pagando === p.id ? "Abriendo el pago…" : `${p.nombre}: ${textoCreditos(p.creditos)}`}
+                </span>
+                <span>{textoPrecio(p.precioCop)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {error && (
         <p className="caja-error" role="alert">
           {error}

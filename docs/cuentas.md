@@ -73,3 +73,28 @@ cuenta imitado (`auth.users`, `auth.uid()`, roles): acreditar una sola vez, no q
 debate una sola vez, devolver una sola vez, que cada quien vea solo su saldo y que el navegador no pueda
 mover créditos (`tests/creditos.test.ts`). Lo que no cubre: dos peticiones simultáneas reales (PGlite tiene
 una sola conexión); ahí protege el `UPDATE … WHERE creditos >= n` y el índice único de `movimientos`.
+
+## Comprar créditos (Mercado Pago Checkout Pro)
+
+Cada paquete (`lib/paquetes.ts`, **precios provisionales** hasta la tarea cotejo-j9s6uq) se paga con una
+preferencia de Checkout Pro:
+
+1. «Comprar créditos» en el panel → `POST /api/pagos/preferencia { paquete }`.
+2. La ruta exige sesión (401), valida el paquete (400; el precio sale del servidor, nunca del cliente) y
+   llama a `https://api.mercadopago.com/checkout/preferences` (COP, `external_reference` =
+   `usuario:paquete:uuid`, `X-Idempotency-Key`). Devuelve `{ url }` (el `init_point`) y el navegador va ahí.
+3. Mercado Pago devuelve a `/pagos/vuelta` (informativa: **no acredita**) y avisa a
+   `/api/pagos/webhook` (tarea cotejo-rsvbzn), que es lo único que suma créditos.
+
+Variables:
+
+```sh
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-...   # solo servidor; credenciales de Mercado Pago (usar las de prueba primero)
+NEXT_PUBLIC_SITE_URL=https://<dominio> # opcional
+```
+
+Sin `MERCADOPAGO_ACCESS_TOKEN` la ruta responde 503. **URL pública:** se usa `NEXT_PUBLIC_SITE_URL` si
+existe; si no, el origen de la propia petición. En Vercel con dominio propio conviene fijarla (el origen
+podría ser el de un preview). Con una URL que no sea `https` (localhost) no se manda `auto_return`, porque
+Mercado Pago lo rechaza; la persona vuelve con el botón de Mercado Pago. El webhook no llega a localhost:
+para probarlo entero hace falta un túnel https y `NEXT_PUBLIC_SITE_URL` apuntando a él.
