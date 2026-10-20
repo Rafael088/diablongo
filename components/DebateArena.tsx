@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 import type { Bando } from "./PersonajeAnimado";
 import { DebateConfig, DebateMessage, DebateRole } from "@/types";
 import { TOTAL_TURNS, canIntervene, countTurnsPlayed, getTurn } from "@/lib/debateEngine";
 import { useDebate, type DebateStatus, type GenerateTurn } from "@/hooks/useDebate";
 import { useTypewriter } from "@/hooks/useTypewriter";
+import { useSoundEnabled, setSoundEnabled } from "@/hooks/useSoundEnabled";
+import { getBaseFrequency, playBlip, shouldPlayBlip } from "@/lib/blips";
 import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
 import PersonajeAnimado from "./PersonajeAnimado";
 import SummaryPanel from "./SummaryPanel";
@@ -52,6 +55,8 @@ export default function DebateArena({
   const debate = useDebate(config, { generate, initialMessages, initialStatus, persist });
   const { messages, status, thinking, error, textRead } = debate;
   const [interventionText, setInterventionText] = useState("");
+  const soundEnabled = useSoundEnabled();
+  const prevCountRef = useRef(0);
 
   const last = messages.length > 0 ? messages[messages.length - 1] : null;
   const turnsPlayed = countTurnsPlayed(messages);
@@ -60,11 +65,35 @@ export default function DebateArena({
   // Frase que se muestra en la caja: la última dicha por un personaje, o la
   // intervención del usuario recién hecha.
   const lineText = thinking ? "..." : last?.content ?? "";
-  const { shown, done, skip } = useTypewriter(lineText, instant || thinking);
+  const { shown, count, done, skip } = useTypewriter(lineText, instant || thinking);
 
   useEffect(() => {
     if (done && !thinking) textRead();
   }, [done, thinking, lineText, textRead]);
+
+  // Toca blips mientras se escribe (cada 2 letras).
+  // Ignora espacios y puntuación, y no toca si thinking o instant.
+  useEffect(() => {
+    if (!soundEnabled || thinking || instant || !last) {
+      prevCountRef.current = count;
+      return;
+    }
+
+    const speaker = last.role as DebateRole | "user";
+
+    if (count > prevCountRef.current && (speaker === "pro" || speaker === "con")) {
+      const frequency = getBaseFrequency(speaker);
+
+      // Revisar cada carácter entre prevCount y count
+      for (let i = prevCountRef.current; i < count; i++) {
+        if (shouldPlayBlip(lineText, i)) {
+          playBlip(frequency, 50, 0.05);
+        }
+      }
+    }
+
+    prevCountRef.current = count;
+  }, [count, soundEnabled, thinking, instant, last, lineText]);
 
   // Clic o tecla para completar la frase al instante.
   useEffect(() => {
@@ -254,6 +283,14 @@ export default function DebateArena({
             {status === "running" ? "Pausar" : "Continuar"}
           </button>
         )}
+        <button
+          className="arena-enlace"
+          onClick={() => setSoundEnabled(!soundEnabled)}
+          aria-label={soundEnabled ? "Silenciar sonido" : "Activar sonido"}
+          aria-pressed={soundEnabled}
+        >
+          {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+        </button>
         <button className="arena-enlace" onClick={handleReset}>
           Reiniciar
         </button>
