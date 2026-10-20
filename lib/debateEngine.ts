@@ -1,4 +1,4 @@
-import type { DebatePhase, DebateRole } from "@/types";
+import type { DebateMessage, DebatePhase, DebateRole } from "@/types";
 
 /**
  * Motor de ping-pong del debate Ángel (pro) contra Diablo (con).
@@ -21,9 +21,12 @@ import type { DebatePhase, DebateRole } from "@/types";
  * "counter" (contrarréplica) en el flujo; sigue en el tipo y en prompts.ts solo
  * por compatibilidad.
  *
- * Intervención del usuario: NO es una llamada extra. El texto se guarda y el
- * siguiente turno del plan lo recibe en su prompt (campo `intervention`), así
- * el total sigue siendo 8. El punto definido es a mitad del debate, tras el
+ * Intervención del usuario: NO es una llamada extra. Queda en el historial como
+ * mensaje con role "user" (lo ven los DOS personajes en todos los turnos
+ * siguientes, como [USUARIO]) y el turno inmediatamente siguiente de CADA
+ * personaje la recibe además en su prompt (campo `intervention`, ver
+ * pendingIntervention) para responderle. Los mensajes del usuario no cuentan
+ * como turnos (countTurnsPlayed), así el total sigue siendo 8. El punto definido es a mitad del debate, tras el
  * turno INTERVENTION_AFTER_TURN (4): ahí la arena se pausa para ofrecerla. El
  * usuario también puede intervenir en cualquier otro momento antes del final
  * (canIntervene); si intervienen varias veces antes del siguiente turno, los
@@ -86,4 +89,31 @@ export function mergeIntervention(
 ): string {
   const clean = text.trim();
   return pending ? `${pending} ${clean}` : clean;
+}
+
+/** Turnos jugados por los personajes: los mensajes del usuario no cuentan. */
+export function countTurnsPlayed(messages: readonly DebateMessage[]): number {
+  return messages.filter((m) => m.role !== "user").length;
+}
+
+/**
+ * Intervención que `speaker` aún no ha contestado: lo que el usuario dijo
+ * después del último mensaje de ese personaje (junto si fueron varias).
+ * Sirve para que el turno siguiente de cada personaje le responda al usuario.
+ */
+export function pendingIntervention(
+  messages: readonly DebateMessage[],
+  speaker: DebateRole
+): string | undefined {
+  let lastOwn = -1;
+  messages.forEach((m, i) => {
+    if (m.role === speaker) lastOwn = i;
+  });
+  let pending: string | undefined;
+  messages.forEach((m, i) => {
+    if (i > lastOwn && m.role === "user") {
+      pending = mergeIntervention(pending, m.content);
+    }
+  });
+  return pending;
 }

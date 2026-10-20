@@ -1,9 +1,10 @@
-import { DebateMessage, DebatePhase, DebateRole } from "@/types";
+import type { DebateMessage, DebatePhase, DebateRole, MessageRole } from "@/types";
 
 // Ids internos: "pro" = Ángel, "con" = Diablo.
 export const MAX_WORDS = 35;
 
-function roleLabel(role: DebateRole): string {
+function roleLabel(role: MessageRole): string {
+  if (role === "user") return "USUARIO";
   return role === "pro" ? "ÁNGEL" : "DIABLO";
 }
 
@@ -62,10 +63,12 @@ export function buildUserPrompt(
   }
 
   if (intervention) {
-    prompt += `El usuario te dijo: "${intervention}"\n\n`;
+    prompt += `El usuario habló (aparece como [USUARIO] arriba) y te toca responderle: "${intervention}"\n\n`;
   }
 
-  prompt += phaseInstruction(phase, role);
+  prompt += intervention
+    ? `Responde directo a lo que dijo el usuario, a favor de ${sideOf(role)}, y si el otro habló antes, refuta eso también.`
+    : phaseInstruction(phase, role);
   prompt += ` Recuerda: máximo ${MAX_WORDS} palabras.`;
 
   return prompt;
@@ -88,11 +91,14 @@ function phaseNameInSpanish(phase: DebatePhase): string {
   }
 }
 
+function sideOf(role: DebateRole): string {
+  return role === "pro"
+    ? "lo que más le conviene al usuario a largo plazo"
+    : "la tentación del momento";
+}
+
 function phaseInstruction(phase: DebatePhase, role: DebateRole): string {
-  const side =
-    role === "pro"
-      ? "lo que más le conviene al usuario a largo plazo"
-      : "la tentación del momento";
+  const side = sideOf(role);
 
   switch (phase) {
     case "opening":

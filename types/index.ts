@@ -16,8 +16,11 @@ export interface DebaterConfig {
   name: string;
 }
 
+/** Quien escribe un mensaje del historial: un personaje o el usuario. */
+export type MessageRole = DebateRole | "user";
+
 export interface DebateMessage {
-  role: DebateRole;
+  role: MessageRole;
   content: string;
   round: number;
   phase: DebatePhase;

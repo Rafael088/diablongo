@@ -8,35 +8,42 @@ import {
   getNextTurn,
   shouldPauseForIntervention,
   canIntervene,
-  mergeIntervention,
+  countTurnsPlayed,
+  pendingIntervention,
 } from "../lib/debateEngine.ts";
 import type { Turn } from "../lib/debateEngine.ts";
+import { buildUserPrompt } from "../lib/prompts.ts";
+import type { DebateMessage } from "../types/index.ts";
 
 const errores: string[] = [];
 const fallar = (m: string) => errores.push(m);
 
 const nombre = { pro: "Ángel", con: "Diablo" } as const;
 const turnos: Turn[] = [];
-const llamadas: { turn: Turn; intervention?: string }[] = [];
-let pendiente: string | undefined;
+const llamadas: { turn: Turn; intervention?: string; prompt: string }[] = [];
+const messages: DebateMessage[] = [];
 let pausas = 0;
 
 let turn: Turn | null = getInitialTurn();
 while (turn && turnos.length < 50) {
-  llamadas.push({ turn, intervention: pendiente });
-  pendiente = undefined;
+  // igual que la arena: la intervención sale del historial, no de un estado aparte
+  const intervention = pendingIntervention(messages, turn.nextSpeaker);
+  const prompt = buildUserPrompt("¿pido pizza?", turn.nextSpeaker, turn.phase, messages, intervention);
+  llamadas.push({ turn, intervention, prompt });
   turnos.push(turn);
-  const hechos = turnos.length;
+  messages.push({ role: turn.nextSpeaker, content: `respuesta ${turnos.length}`, round: turn.round, phase: turn.phase });
+  const hechos = countTurnsPlayed(messages);
   turn = getNextTurn(hechos);
   if (shouldPauseForIntervention(hechos)) {
     pausas++;
-    // el usuario interviene en la pausa: NO es una llamada extra
+    // el usuario interviene en la pausa (dos veces): NO es una llamada extra
     if (!canIntervene(hechos)) fallar("no deja intervenir a mitad");
-    pendiente = mergeIntervention(pendiente, "  ¿y si lo dejo para mañana?  ");
-    pendiente = mergeIntervention(pendiente, "mejor hoy");
+    for (const content of ["  ¿y si lo dejo para mañana?  ", "mejor hoy"]) {
+      messages.push({ role: "user", content: content.trim(), round: 2, phase: "intervention" });
+    }
   }
 }
-if (canIntervene(turnos.length)) fallar("deja intervenir con el debate terminado");
+if (canIntervene(countTurnsPlayed(messages))) fallar("deja intervenir con el debate terminado");
 
 console.log(`Debate simulado: ${llamadas.length} llamadas (TOTAL_TURNS=${TOTAL_TURNS})`);
 llamadas.forEach(({ turn: t, intervention }, i) => {
@@ -58,14 +65,22 @@ if (fases !== esperadas) fallar(`fases: ${fases}`);
 if (turnos[0].nextSpeaker !== "pro") fallar("debe abrir Ángel");
 if (turnos[7].nextSpeaker !== "con") fallar("debe cerrar Diablo");
 if (pausas !== 1 || INTERVENTION_AFTER_TURN !== 4) fallar("debe haber una sola pausa tras el turno 4");
-const conInt = llamadas.filter((l) => l.intervention);
-if (conInt.length !== 1 || llamadas.indexOf(conInt[0]) !== INTERVENTION_AFTER_TURN)
-  fallar("la intervención debe llegar en el turno 5");
-if (conInt[0]?.intervention !== "¿y si lo dejo para mañana? mejor hoy") fallar("no se juntaron bien las intervenciones");
+const esperadaInt = "¿y si lo dejo para mañana? mejor hoy";
+const conInt = llamadas.map((l, i) => (l.intervention ? i + 1 : 0)).filter(Boolean);
+if (conInt.join(",") !== "5,6") fallar(`la intervención debe llegar solo en los turnos 5 y 6 y llegó en: ${conInt.join(",")}`);
+for (const n of [5, 6]) {
+  const l = llamadas[n - 1];
+  if (l.intervention !== esperadaInt) fallar(`el turno ${n} no recibió la intervención junta`);
+  if (!l.prompt.includes(esperadaInt) || !l.prompt.includes("responderle")) fallar(`el prompt del turno ${n} no pide responder al usuario`);
+}
+if (!llamadas[5].prompt.includes("[USUARIO] mejor hoy")) fallar("el historial del turno 6 no contiene [USUARIO]");
+if (!llamadas[6].prompt.includes("[USUARIO]") || llamadas[6].intervention) fallar("el turno 7 debe ver [USUARIO] en el historial pero no repetir la intervención");
+if (messages.filter((m) => m.role === "user").length !== 2) fallar("el historial debe conservar los mensajes del usuario");
+if (countTurnsPlayed(messages) !== 8) fallar("los mensajes del usuario no deben contar como turnos");
 if (getNextTurn(TOTAL_TURNS) !== null) fallar("debe terminar tras el turno 8");
 
 if (errores.length) {
   console.error("\nFALLO:\n- " + errores.join("\n- "));
   process.exit(1);
 }
-console.log("\nOK: 8 llamadas, alternancia correcta, intervención sin llamadas extra.");
+console.log("\nOK: 8 llamadas, alternancia correcta, intervención en turnos 5 y 6 e historial con [USUARIO], sin llamadas extra.");

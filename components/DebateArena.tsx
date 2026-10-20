@@ -6,8 +6,9 @@ import { DebateConfig, DebateMessage, DebateRole } from "@/types";
 import {
   TOTAL_TURNS,
   canIntervene,
+  countTurnsPlayed,
   getTurn,
-  mergeIntervention,
+  pendingIntervention,
   shouldPauseForIntervention,
 } from "@/lib/debateEngine";
 import { saveDebate } from "@/lib/storage";
@@ -28,7 +29,6 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
   const [error, setError] = useState<string | null>(null);
 
   const pendingRef = useRef(false);
-  const interventionRef = useRef<string | undefined>(undefined);
   const messagesRef = useRef<DebateMessage[]>([]);
   const statusRef = useRef<"idle" | "running" | "paused" | "finished">("idle");
   const runNextTurnRef = useRef<() => void>(() => {});
@@ -40,12 +40,14 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
   }, []);
 
   const executeTurn = useCallback(
-    async (speaker: DebateRole, phase: string, round: number, intervention?: string): Promise<boolean> => {
+    async (speaker: DebateRole, phase: string, round: number): Promise<boolean> => {
       const debater = speaker === "pro" ? config.pro : config.con;
       setCurrentTurn({ speaker, phase, round });
       setError(null);
 
       try {
+        // Lo que el usuario dijo y este personaje aún no contestó (va también en el historial).
+        const intervention = pendingIntervention(messagesRef.current, speaker);
         const response = await fetch("/api/debate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -94,24 +96,23 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
     if (pendingRef.current) return;
     pendingRef.current = true;
 
-    const turnsDone = messagesRef.current.length;
+    const turnsDone = countTurnsPlayed(messagesRef.current);
     const turn = getTurn(turnsDone);
     if (!turn) {
       pendingRef.current = false;
       return;
     }
 
-    // La intervención pendiente viaja en este mismo turno: no suma llamadas.
-    const intervention = interventionRef.current;
-    const success = await executeTurn(turn.nextSpeaker, turn.phase, turn.round, intervention);
+    // La intervención ya está en el historial y executeTurn la manda a este
+    // personaje si aún no la contestó: no suma llamadas.
+    const success = await executeTurn(turn.nextSpeaker, turn.phase, turn.round);
 
     if (!success) {
       pendingRef.current = false;
       return;
     }
-    interventionRef.current = undefined;
 
-    const done = messagesRef.current.length;
+    const done = countTurnsPlayed(messagesRef.current);
     const next = getTurn(done);
 
     if (!next) {
@@ -165,10 +166,20 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
     }
   };
 
-  // La intervención no llama al modelo: se guarda y el siguiente turno la incorpora.
+  // La intervención no llama al modelo: queda en el historial como mensaje del
+  // usuario y el siguiente turno de cada personaje le responde.
   const handleIntervene = (text: string) => {
-    if (!canIntervene(messagesRef.current.length)) return;
-    interventionRef.current = mergeIntervention(interventionRef.current, text);
+    const clean = text.trim();
+    if (!clean || !canIntervene(countTurnsPlayed(messagesRef.current))) return;
+    const userMessage: DebateMessage = {
+      role: "user",
+      content: clean,
+      round: getTurn(countTurnsPlayed(messagesRef.current))?.round ?? 0,
+      phase: "intervention",
+    };
+    const updated = [...messagesRef.current, userMessage];
+    messagesRef.current = updated;
+    setMessages(updated);
   };
 
   const handleReset = () => {
@@ -221,9 +232,15 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
               <p>Presiona Iniciar para comenzar el debate</p>
             </motion.div>
           )}
-          {messages.map((message, index) => (
-            <ArgumentBubble key={index} message={message} index={index} />
-          ))}
+          {messages.map((message, index) =>
+            message.role === "user" ? (
+              <p key={index} className="text-center text-sm text-zinc-300 mb-6">
+                <strong>Tú:</strong> {message.content}
+              </p>
+            ) : (
+              <ArgumentBubble key={index} message={message} index={index} />
+            )
+          )}
         </AnimatePresence>
         <div ref={(el) => el?.scrollIntoView({ behavior: "smooth" })} />
       </div>
