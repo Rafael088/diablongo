@@ -13,6 +13,7 @@ import {
   EstadoContador,
   ModoConfig,
   OPENROUTER_DISPONIBLE,
+  modoDelServidor,
   modoInicial,
   pedirCupo,
   proveedorDelModo,
@@ -20,6 +21,12 @@ import {
   textoContador,
 } from "@/lib/modoConfig";
 import TurnstileWidget from "./TurnstileWidget";
+import { configSupabase } from "@/lib/supabase/config";
+import { CREDITOS_POR_DEBATE } from "@/lib/creditosDebate";
+import { textoCreditos } from "@/lib/cuenta";
+
+// «Con créditos» solo existe si hay cuentas (Supabase configurado).
+const HAY_CUENTAS = configSupabase() !== null;
 
 interface ConfigPanelProps {
   /** `turnstile` es el token de Cloudflare (de un solo uso); falta solo en desarrollo sin sitekey. */
@@ -71,7 +78,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
   const disponibles = proveedoresDisponibles();
   const porDefecto = disponibles[0];
   const hayKeys = disponibles.some((p) => leerKey(p.id) !== "");
-  const [modo, setModo] = useState<ModoConfig>(() => (vieneDeOpenRouter() ? "openrouter" : modoInicial(saved, hayKeys)));
+  const [modo, setModo] = useState<ModoConfig>(() => (vieneDeOpenRouter() ? "openrouter" : modoInicial(saved, hayKeys, HAY_CUENTAS)));
   const [topic, setTopic] = useState((saved?.topic ?? "").slice(0, MAX_TEMA));
 
   const [proProvider, setProProvider] = useState(proveedorValido(saved?.proProvider, disponibles));
@@ -166,7 +173,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
     const proProv = proveedorDelModo(modo, proProvider);
     const conProv = proveedorDelModo(modo, conProvider);
     const idsKey = enOpenRouter ? [PROVEEDOR_OAUTH] : [proProvider, conProvider];
-    const gratis = modo === "gratis";
+    const gratis = modoDelServidor(modo);
 
     saveConfig({
       topic,
@@ -239,6 +246,13 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
 
           {modo === "gratis" && <ContadorGratis estado={contador} />}
 
+          {modo === "creditos" && (
+            <p className="config-aviso" role="status">
+              Ángel y Diablo juegan con modelos de pago. Cada debate cuesta {textoCreditos(CREDITOS_POR_DEBATE)} de
+              tu cuenta; si los modelos fallan antes de terminar, te lo devolvemos. Entra a tu cuenta arriba.
+            </p>
+          )}
+
           {modo === "openrouter" && (
             <ConexionOpenRouter
               conectado={conectado}
@@ -303,6 +317,8 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
           <p className="config-nota">
             {modo === "openrouter"
               ? "La key que te da OpenRouter se guarda solo en esta pestaña y se borra al cerrarla. Nunca se envía a ningún servidor propio."
+              : modo === "creditos"
+              ? "No necesitas key: el servidor pone los modelos y descuenta los créditos al empezar."
               : modo === "key"
               ? "Tu API key se guarda solo en esta pestaña y se borra al cerrarla, salvo que marques «Recordar en este dispositivo». Nunca se envía a ningún servidor propio."
               : "Sin key no guardamos nada tuyo: el servidor pone el modelo y el límite es por día."}
@@ -435,14 +451,19 @@ const OPCIONES_MODO: { id: ModoConfig; titulo: string; detalle: string }[] = [
   { id: "gratis", titulo: "Gratis", detalle: "Sin key, con un límite por día" },
   { id: "openrouter", titulo: "Conectar OpenRouter", detalle: OPENROUTER_DISPONIBLE ? "Con tu cuenta, sin copiar keys" : "Próximamente" },
   { id: "key", titulo: "Mi key", detalle: "Usa tu propia API key" },
+  { id: "creditos", titulo: "Con créditos", detalle: `Modelos buenos, ${textoCreditos(CREDITOS_POR_DEBATE)} por debate` },
 ];
 
 function SelectorModo({ modo, onChange }: { modo: ModoConfig; onChange: (m: ModoConfig) => void }) {
   return (
     <div>
       <span id="modo-etiqueta" className="config-etiqueta">¿Cómo quieres jugar?</span>
-      <div role="radiogroup" aria-labelledby="modo-etiqueta" className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {OPCIONES_MODO.map((o) => (
+      <div
+        role="radiogroup"
+        aria-labelledby="modo-etiqueta"
+        className={`grid grid-cols-1 gap-3 ${HAY_CUENTAS ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"}`}
+      >
+        {OPCIONES_MODO.filter((o) => o.id !== "creditos" || HAY_CUENTAS).map((o) => (
           <button
             key={o.id}
             type="button"

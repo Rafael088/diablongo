@@ -2,6 +2,7 @@ import { FASES } from "../types/index.ts";
 import type { DebateMessage, DebatePhase, DebateRole, ProviderConfig } from "../types/index.ts";
 import { getProviderById } from "./providers.ts";
 import { PROVEEDOR_GRATIS, proveedorGratis } from "./gratis.ts";
+import { PROVEEDOR_CREDITOS, proveedorCreditos } from "./creditosDebate.ts";
 import {
   MAX_INTERVENCION,
   MAX_INTERVENCIONES_USUARIO,
@@ -48,12 +49,19 @@ export function validarTema(topic: unknown): { ok: true; topic: string } | { ok:
 }
 
 export type ResultadoProveedor =
-  | { ok: true; provider: ProviderConfig; model: string; esGratis: boolean }
+  | {
+      ok: true;
+      provider: ProviderConfig;
+      model: string;
+      esGratis: boolean;
+      /** Modo gratis o créditos: key y modelo los pone el servidor; los del cliente se ignoran. */
+      delServidor: boolean;
+    }
   | { ok: false; error: string };
 
 /**
- * Proveedor y modelo contra la lista blanca (lib/providers.ts). En modo gratis el
- * modelo del cliente se ignora y se devuelve "" (lo decide el servidor).
+ * Proveedor y modelo contra la lista blanca (lib/providers.ts). En modo gratis y en modo
+ * créditos el modelo del cliente se ignora y se devuelve "" (lo decide el servidor).
  * La usan /api/debate (cada turno) y /api/debate/start (al emitir el token).
  */
 export function validarProveedorModelo(
@@ -63,13 +71,15 @@ export function validarProveedorModelo(
 ): ResultadoProveedor {
   if (typeof providerId !== "string") return { ok: false, error: "Falta el proveedor." };
   const esGratis = providerId === PROVEEDOR_GRATIS;
-  const provider = esGratis ? proveedorGratis : getProviderById(providerId, ...args);
+  const esCreditos = providerId === PROVEEDOR_CREDITOS;
+  const delServidor = esGratis || esCreditos;
+  const provider = esGratis ? proveedorGratis : esCreditos ? proveedorCreditos : getProviderById(providerId, ...args);
   if (!provider) return { ok: false, error: "El proveedor indicado no está permitido." };
-  if (esGratis) return { ok: true, provider, model: "", esGratis };
+  if (delServidor) return { ok: true, provider, model: "", esGratis, delServidor };
   if (typeof model !== "string" || !provider.models.includes(model)) {
     return { ok: false, error: "El modelo indicado no está permitido para ese proveedor." };
   }
-  return { ok: true, provider, model, esGratis };
+  return { ok: true, provider, model, esGratis, delServidor };
 }
 
 /**
@@ -90,11 +100,11 @@ export function validarTurno(body: unknown, ...args: [entorno?: string]): Result
   if (typeof phase !== "string" || !(FASES as readonly string[]).includes(phase)) {
     return fallo("La fase indicada no es válida.");
   }
-  // Modo gratis: model y apiKey del cliente se ignoran (ni se validan); el servidor decide ambos.
+  // Modo gratis o créditos: model y apiKey del cliente se ignoran (ni se validan); el servidor decide ambos.
   const prov = validarProveedorModelo(providerId, model, ...args);
   if (!prov.ok) return fallo(prov.error);
-  const { provider, esGratis } = prov;
-  if (!esGratis) {
+  const { provider, delServidor } = prov;
+  if (!delServidor) {
     if (apiKey !== undefined && typeof apiKey !== "string") {
       return fallo("La clave de API no es válida.");
     }
@@ -145,7 +155,7 @@ export function validarTurno(body: unknown, ...args: [entorno?: string]): Result
       phase: phase as DebatePhase,
       provider,
       model: prov.model,
-      apiKey: !esGratis && typeof apiKey === "string" ? apiKey : "",
+      apiKey: !delServidor && typeof apiKey === "string" ? apiKey : "",
       history: historial,
       intervention: intervention as string | undefined,
     },
