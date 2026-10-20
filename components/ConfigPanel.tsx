@@ -13,7 +13,6 @@ interface ConfigPanelProps {
 
 export default function ConfigPanel({ onStart }: ConfigPanelProps) {
   const [topic, setTopic] = useState("");
-  const [rounds, setRounds] = useState(3);
 
   const [proProvider, setProProvider] = useState("openrouter");
   const [proModel, setProModel] = useState(providers[0].models[0]);
@@ -27,7 +26,6 @@ export default function ConfigPanel({ onStart }: ConfigPanelProps) {
     const saved = getConfig();
     if (saved) {
       setTopic(saved.topic);
-      setRounds(saved.rounds);
       setProProvider(saved.proProvider);
       setProModel(saved.proModel);
       setProApiKey(saved.proApiKey || "");
@@ -56,7 +54,6 @@ export default function ConfigPanel({ onStart }: ConfigPanelProps) {
 
     saveConfig({
       topic,
-      rounds,
       proProvider,
       proModel,
       conProvider,
@@ -81,7 +78,7 @@ export default function ConfigPanel({ onStart }: ConfigPanelProps) {
       name: "CON",
     };
 
-    onStart({ topic: topic.trim(), rounds, pro, con });
+    onStart({ topic: topic.trim(), pro, con });
   };
 
   return (
@@ -135,24 +132,6 @@ export default function ConfigPanel({ onStart }: ConfigPanelProps) {
               onModelChange={setConModel}
               onApiKeyChange={setConApiKey}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Rondas de debate: {rounds}
-            </label>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              value={rounds}
-              onChange={(e) => setRounds(parseInt(e.target.value))}
-              className="w-full accent-indigo-500"
-            />
-            <div className="flex justify-between text-xs text-zinc-500 mt-1">
-              <span>Rápido</span>
-              <span>Profundo</span>
-            </div>
           </div>
 
           <button

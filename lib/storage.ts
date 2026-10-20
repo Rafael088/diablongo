@@ -36,7 +36,6 @@ export function deleteDebate(id: string): void {
 
 export interface SavedConfig {
   topic: string;
-  rounds: number;
   proProvider: string;
   proModel: string;
   conProvider: string;

@@ -3,7 +3,13 @@
 import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DebateConfig, DebateMessage, DebateRole } from "@/types";
-import { getInitialTurn, getNextPhase } from "@/lib/debateEngine";
+import {
+  TOTAL_TURNS,
+  canIntervene,
+  getTurn,
+  mergeIntervention,
+  shouldPauseForIntervention,
+} from "@/lib/debateEngine";
 import { saveDebate } from "@/lib/storage";
 import DebaterCard from "./DebaterCard";
 import ArgumentBubble from "./ArgumentBubble";
@@ -22,6 +28,7 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
   const [error, setError] = useState<string | null>(null);
 
   const pendingRef = useRef(false);
+  const interventionRef = useRef<string | undefined>(undefined);
   const messagesRef = useRef<DebateMessage[]>([]);
   const currentTurnRef = useRef<{ phase: string; round: number; speaker: DebateRole } | null>(null);
   const statusRef = useRef(status);
@@ -86,43 +93,37 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
     if (pendingRef.current) return;
     pendingRef.current = true;
 
-    const turn = currentTurnRef.current
-      ? {
-          phase: currentTurnRef.current.phase,
-          round: currentTurnRef.current.round,
-          nextSpeaker: currentTurnRef.current.speaker,
-        }
-      : getInitialTurn();
+    const turnsDone = messagesRef.current.length;
+    const turn = getTurn(turnsDone);
+    if (!turn) {
+      pendingRef.current = false;
+      return;
+    }
 
-    const success = await executeTurn(turn.nextSpeaker, turn.phase, turn.round);
+    // La intervención pendiente viaja en este mismo turno: no suma llamadas.
+    const intervention = interventionRef.current;
+    const success = await executeTurn(turn.nextSpeaker, turn.phase, turn.round, intervention);
 
     if (!success) {
       pendingRef.current = false;
       return;
     }
+    interventionRef.current = undefined;
 
-    const next = getNextPhase(
-      turn.phase as DebateMessage["phase"],
-      turn.round,
-      config.rounds,
-      turn.nextSpeaker
-    );
+    const done = messagesRef.current.length;
+    const next = getTurn(done);
 
-    const finished =
-      turn.phase === "closing" && turn.nextSpeaker === "con";
-
-    if (finished) {
+    if (!next) {
       setStatus("finished");
       pendingRef.current = false;
-      const finalState = {
+      saveDebate({
         id: Date.now().toString(),
         topic: config.topic,
-        rounds: config.rounds,
+        totalTurns: TOTAL_TURNS,
         currentRound: turn.round,
         messages: messagesRef.current,
         status: "finished" as const,
-      };
-      saveDebate(finalState);
+      });
       return;
     }
 
@@ -131,6 +132,13 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
       phase: next.phase,
       round: next.round,
     });
+
+    if (shouldPauseForIntervention(done)) {
+      // Mitad del debate: pausa para que el usuario pueda intervenir.
+      setStatus("paused");
+      pendingRef.current = false;
+      return;
+    }
 
     pendingRef.current = false;
 
@@ -141,7 +149,7 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
         }
       }, 1200);
     }
-  }, [config.rounds, executeTurn, status]);
+  }, [config.topic, executeTurn]);
 
   const handlePlayPause = () => {
     if (status === "running") {
@@ -152,17 +160,10 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
     }
   };
 
-  const handleIntervene = async (text: string, target: "pro" | "con") => {
-    if (status === "finished") return;
-
-    setStatus("paused");
-    pendingRef.current = false;
-
-    const success = await executeTurn(target, "intervention", currentTurnRef.current?.round || 1, text);
-    if (success) {
-      setStatus("running");
-      setTimeout(runNextTurn, 100);
-    }
+  // La intervención no llama al modelo: se guarda y el siguiente turno la incorpora.
+  const handleIntervene = (text: string) => {
+    if (!canIntervene(messagesRef.current.length)) return;
+    interventionRef.current = mergeIntervention(interventionRef.current, text);
   };
 
   const handleReset = () => {
@@ -187,7 +188,7 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
       <div className="text-center mb-4">
         <h2 className="text-xl md:text-2xl font-bold text-white mb-2">{config.topic}</h2>
         <p className="text-zinc-400 text-sm">
-          {config.rounds} rondas · {config.pro.model} vs {config.con.model}
+          {TOTAL_TURNS} turnos · {config.pro.model} vs {config.con.model}
         </p>
       </div>
 

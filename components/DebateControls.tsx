@@ -8,7 +8,7 @@ interface DebateControlsProps {
   status: "idle" | "running" | "paused" | "finished";
   onPlayPause: () => void;
   onReset: () => void;
-  onIntervene?: (message: string, target: "pro" | "con") => void;
+  onIntervene?: (message: string) => void;
 }
 
 export default function DebateControls({
@@ -19,11 +19,10 @@ export default function DebateControls({
 }: DebateControlsProps) {
   const [showIntervention, setShowIntervention] = useState(false);
   const [interventionText, setInterventionText] = useState("");
-  const [interventionTarget, setInterventionTarget] = useState<"pro" | "con">("pro");
 
   const handleIntervene = () => {
     if (!interventionText.trim() || !onIntervene) return;
-    onIntervene(interventionText.trim(), interventionTarget);
+    onIntervene(interventionText.trim());
     setInterventionText("");
     setShowIntervention(false);
   };
@@ -73,28 +72,6 @@ export default function DebateControls({
             exit={{ opacity: 0, height: 0 }}
             className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4"
           >
-            <div className="flex gap-2 mb-3">
-              <button
-                onClick={() => setInterventionTarget("pro")}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                  interventionTarget === "pro"
-                    ? "bg-emerald-500/20 text-emerald-300"
-                    : "bg-zinc-800 text-zinc-400"
-                }`}
-              >
-                A PRO
-              </button>
-              <button
-                onClick={() => setInterventionTarget("con")}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                  interventionTarget === "con"
-                    ? "bg-rose-500/20 text-rose-300"
-                    : "bg-zinc-800 text-zinc-400"
-                }`}
-              >
-                A CON
-              </button>
-            </div>
             <div className="flex gap-2">
               <input
                 type="text"

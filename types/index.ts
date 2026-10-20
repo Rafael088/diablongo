@@ -32,7 +32,6 @@ export type DebatePhase =
 
 export interface DebateConfig {
   topic: string;
-  rounds: number;
   pro: DebaterConfig;
   con: DebaterConfig;
 }
@@ -40,7 +39,7 @@ export interface DebateConfig {
 export interface DebateState {
   id: string;
   topic: string;
-  rounds: number;
+  totalTurns: number;
   currentRound: number;
   messages: DebateMessage[];
   status: "idle" | "running" | "paused" | "finished";
