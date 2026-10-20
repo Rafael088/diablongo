@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { consumirCupo, esModoGratis } from "./limites.ts";
 import type { ConfigInicio } from "./tokenDebate.ts";
 
 /**
@@ -19,16 +20,35 @@ export interface ContextoInicio {
   config: ConfigInicio;
   /** Cuerpo ya parseado, por si una guardia necesita un campo propio (p. ej. el token de Turnstile). */
   cuerpo: Record<string, unknown>;
+  /** Campos que las guardias quieren añadir a la respuesta de /start cuando acepta (p. ej. `quedan`). */
+  extra?: Record<string, unknown>;
 }
 
 export interface RechazoGuardia {
   status: number;
   error: string;
+  /** Campos extra de la respuesta de rechazo (p. ej. `quedan`, `reinicia` en el 429). */
+  campos?: Record<string, unknown>;
 }
 
 export type GuardiaInicio = (ctx: ContextoInicio) => Promise<RechazoGuardia | null>;
 
-export const GUARDIAS_INICIO: GuardiaInicio[] = [];
+/**
+ * Límite diario del modo gratis (cotejo-xqsxp8): por IP y cupo global, en Upstash.
+ * Solo cuenta el modo gratis; los debates con key del usuario no gastan cupo.
+ */
+export const guardiaLimiteGratis: GuardiaInicio = async (ctx) => {
+  if (!esModoGratis(ctx.config)) return null;
+  const r = await consumirCupo(ctx.request);
+  if (r.ok) {
+    ctx.extra = { ...ctx.extra, quedan: r.quedan, reinicia: r.reinicia };
+    return null;
+  }
+  if (r.status === 503) return { status: 503, error: r.error };
+  return { status: 429, error: r.error, campos: { quedan: r.quedan, reinicia: r.reinicia } };
+};
+
+export const GUARDIAS_INICIO: GuardiaInicio[] = [guardiaLimiteGratis];
 
 export async function pasarGuardias(
   ctx: ContextoInicio,

@@ -1,3 +1,5 @@
+import { obtenerAlmacen, type Almacen } from "./almacen.ts";
+
 /**
  * Registro de turnos ya jugados: impide repetir un mismo (debate, índice) con
  * un token válido. Con él, un token da como mucho TOTAL_LLAMADAS llamadas.
@@ -62,16 +64,42 @@ export class RegistroTurnosMemoria implements RegistroTurnos {
   }
 }
 
-// TODO(cotejo-xqsxp8): registro persistente en Upstash Redis (SET debate:indice NX PX)
-// para producción. Hasta entonces se usa el de memoria también en producción, que
-// en serverless no es global (ver aviso arriba).
-let registro: RegistroTurnos = new RegistroTurnosMemoria();
+/** Registro persistente en Upstash: SET debate:<id>:<indice> 1 NX PX <ms hasta exp>; liberar = DEL. */
+export class RegistroTurnosUpstash implements RegistroTurnos {
+  constructor(
+    private readonly almacen: Almacen,
+    private readonly reloj: () => number = () => Date.now()
+  ) {}
 
-export function obtenerRegistroTurnos(): RegistroTurnos {
-  return registro;
+  private clave(debateId: string, indice: number): string {
+    return `debate:${debateId}:${indice}`;
+  }
+
+  async marcar(debateId: string, indice: number, expira?: number): Promise<boolean> {
+    const ms = (expira ?? this.reloj() + DURACION_POR_DEFECTO_MS) - this.reloj();
+    return this.almacen.setNX(this.clave(debateId, indice), Math.max(1, ms));
+  }
+
+  async liberar(debateId: string, indice: number): Promise<void> {
+    await this.almacen.del(this.clave(debateId, indice));
+  }
 }
 
-/** Cambia el registro (pruebas o el de Upstash cuando exista). */
+// Si se fijó uno con usarRegistroTurnos se respeta. Si no: con credenciales de Upstash, el
+// persistente (global entre instancias); sin ellas, el de memoria (no global en serverless).
+let registro: RegistroTurnos | undefined;
+let porDefecto: RegistroTurnos | undefined;
+
+export function obtenerRegistroTurnos(): RegistroTurnos {
+  if (registro) return registro;
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const almacen = obtenerAlmacen();
+    if (almacen) return (porDefecto ??= new RegistroTurnosUpstash(almacen));
+  }
+  return (porDefecto ??= new RegistroTurnosMemoria());
+}
+
+/** Cambia el registro (pruebas o uno propio). */
 export function usarRegistroTurnos(nuevo: RegistroTurnos): void {
   registro = nuevo;
 }

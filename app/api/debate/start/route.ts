@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TOTAL_LLAMADAS } from "@/lib/debateEngine";
-import { pasarGuardias } from "@/lib/guardiasInicio";
+import { pasarGuardias, type ContextoInicio } from "@/lib/guardiasInicio";
 import { MENSAJE_SIN_SECRETO, emitirToken, obtenerSecreto, validarInicio } from "@/lib/tokenDebate";
 import { esObjeto } from "@/lib/validarTurno";
 import { MAX_CUERPO_BYTES } from "@/lib/topes";
@@ -33,17 +33,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: MENSAJE_SIN_SECRETO }, { status: 503 });
     }
 
-    const rechazo = await pasarGuardias({
+    const ctx: ContextoInicio = {
       request,
       config: validacion.config,
       cuerpo: esObjeto(body) ? body : {},
-    });
+    };
+    const rechazo = await pasarGuardias(ctx);
     if (rechazo) {
-      return NextResponse.json({ error: rechazo.error }, { status: rechazo.status });
+      return NextResponse.json({ error: rechazo.error, ...rechazo.campos }, { status: rechazo.status });
     }
 
     const { token, payload } = emitirToken(validacion.config, secreto);
-    return NextResponse.json({ token, llamadas: TOTAL_LLAMADAS, expira: payload.exp });
+    return NextResponse.json({ token, llamadas: TOTAL_LLAMADAS, expira: payload.exp, ...ctx.extra });
   } catch (error) {
     console.error("Debate start error:", error instanceof Error ? error.message : "desconocido");
     return NextResponse.json({ error: "No se pudo empezar el debate." }, { status: 500 });
