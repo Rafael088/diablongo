@@ -9,8 +9,8 @@ export function esModo(valor: unknown): valor is ModoConfig {
   return typeof valor === "string" && (MODOS as readonly string[]).includes(valor);
 }
 
-/** «Conectar OpenRouter» (OAuth, tarea cotejo-sah5fs) aún no existe: se ve, pero no se puede usar. */
-export const OPENROUTER_DISPONIBLE = false;
+/** «Conectar OpenRouter» (OAuth PKCE, lib/oauthOpenRouter.ts). */
+export const OPENROUTER_DISPONIBLE = true;
 
 interface ConfigGuardada {
   modo?: unknown;
@@ -21,7 +21,6 @@ interface ConfigGuardada {
 /**
  * Modo con el que abre la pantalla. Una preferencia guardada manda; si no hay (configs viejas),
  * se deduce de los proveedores guardados y, sin nada guardado, de si ya hay alguna key.
- * Un modo «openrouter» guardado cae a gratis mientras no esté disponible.
  */
 export function modoInicial(guardada: ConfigGuardada | null, hayKeys: boolean): ModoConfig {
   const m = guardada?.modo;
@@ -38,18 +37,20 @@ export function puedeIniciar(opts: {
   modo: ModoConfig;
   tema: string;
   verificado: boolean;
-  disponibleOpenRouter?: boolean;
+  /** Hay una key de OpenRouter obtenida por OAuth: sin ella el modo «openrouter» no inicia. */
+  conectadoOpenRouter?: boolean;
   /** Estado del contador: con cupo agotado, el modo gratis no deja iniciar (el servidor respondería 429). */
   contador?: EstadoContador;
 }): boolean {
   if (!opts.tema.trim() || !opts.verificado) return false;
   if (opts.modo === "gratis" && opts.contador?.tipo === "agotado") return false;
-  if (opts.modo === "openrouter") return opts.disponibleOpenRouter ?? OPENROUTER_DISPONIBLE;
+  if (opts.modo === "openrouter") return OPENROUTER_DISPONIBLE && (opts.conectadoOpenRouter ?? false);
   return true;
 }
 
 /** Proveedor que usa cada debatiente según el modo (en «key» elige la persona; en el resto no hay elección). */
 export function proveedorDelModo(modo: ModoConfig, elegido: string): string {
+  if (modo === "openrouter") return "openrouter";
   return modo === "gratis" ? PROVEEDOR_GRATIS : elegido;
 }
 
