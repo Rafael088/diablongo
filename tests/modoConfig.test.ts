@@ -18,8 +18,8 @@ describe("modoInicial", () => {
     expect(modoInicial({ modo: "key" }, false)).toBe("key");
     expect(modoInicial({ modo: "gratis" }, true)).toBe("gratis");
   });
-  it("openrouter guardado cae a gratis mientras no esté disponible", () => {
-    expect(modoInicial({ modo: "openrouter" }, true)).toBe("gratis");
+  it("openrouter guardado se respeta", () => {
+    expect(modoInicial({ modo: "openrouter" }, true)).toBe("openrouter");
   });
   it("configs viejas: se deduce de los proveedores", () => {
     expect(modoInicial({ proProvider: "gratis", conProvider: "gratis" }, true)).toBe("gratis");
@@ -35,6 +35,7 @@ describe("proveedorDelModo", () => {
   it("gratis fuerza el proveedor gratis; key respeta lo elegido", () => {
     expect(proveedorDelModo("gratis", "groq")).toBe("gratis");
     expect(proveedorDelModo("key", "groq")).toBe("groq");
+    expect(proveedorDelModo("openrouter", "groq")).toBe("openrouter");
   });
 });
 
@@ -45,9 +46,9 @@ describe("puedeIniciar", () => {
     expect(puedeIniciar({ ...base, modo: "key", verificado: false })).toBe(false);
     expect(puedeIniciar({ ...base, modo: "key" })).toBe(true);
   });
-  it("openrouter no inicia hasta que exista", () => {
+  it("openrouter no inicia hasta estar conectado", () => {
     expect(puedeIniciar({ ...base, modo: "openrouter" })).toBe(false);
-    expect(puedeIniciar({ ...base, modo: "openrouter", disponibleOpenRouter: true })).toBe(true);
+    expect(puedeIniciar({ ...base, modo: "openrouter", conectadoOpenRouter: true })).toBe(true);
   });
   it("gratis con cupo agotado no inicia; si el contador falla, sí", () => {
     expect(puedeIniciar({ ...base, modo: "gratis", contador: { tipo: "agotado" } })).toBe(false);

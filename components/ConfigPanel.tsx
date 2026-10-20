@@ -6,6 +6,7 @@ import { proveedoresDisponibles, getProviderById } from "@/lib/providers";
 import { DebateConfig, DebaterConfig, ProviderConfig } from "@/types";
 import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
 import { Swords, Settings2, Eye, EyeOff } from "lucide-react";
+import { iniciarConexion, procesarVuelta, PROVEEDOR_OAUTH } from "@/lib/oauthOpenRouter";
 import { AVISO_RECORDAR, estaRecordada, guardarKey, leerKey, olvidarKey } from "@/lib/keys";
 import { MAX_TEMA } from "@/lib/topes";
 import {
@@ -28,6 +29,11 @@ interface ConfigPanelProps {
 const SITEKEY_TURNSTILE = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 // Sin sitekey solo se puede empezar en desarrollo (el servidor también omite la verificación ahí).
 const OMITIR_TURNSTILE = !SITEKEY_TURNSTILE && process.env.NODE_ENV === "development";
+
+// Solo se llama al montar en el navegador (el formulario se monta tras hidratar).
+function vieneDeOpenRouter(): boolean {
+  return typeof window !== "undefined" && new URLSearchParams(window.location.search).has("code");
+}
 
 const subscribeVacio = () => () => {};
 
@@ -65,7 +71,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
   const disponibles = proveedoresDisponibles();
   const porDefecto = disponibles[0];
   const hayKeys = disponibles.some((p) => leerKey(p.id) !== "");
-  const [modo, setModo] = useState<ModoConfig>(() => modoInicial(saved, hayKeys));
+  const [modo, setModo] = useState<ModoConfig>(() => (vieneDeOpenRouter() ? "openrouter" : modoInicial(saved, hayKeys)));
   const [topic, setTopic] = useState((saved?.topic ?? "").slice(0, MAX_TEMA));
 
   const [proProvider, setProProvider] = useState(proveedorValido(saved?.proProvider, disponibles));
@@ -81,8 +87,13 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
   const [recordar, setRecordar] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(disponibles.map((p) => [p.id, estaRecordada(p.id)]))
   );
-  const proApiKey = keys[proProvider] ?? "";
-  const conApiKey = keys[conProvider] ?? "";
+  // En «Conectar OpenRouter» no se elige proveedor: siempre OpenRouter, con la key del OAuth.
+  const enOpenRouter = modo === "openrouter";
+  const proProv0 = enOpenRouter ? PROVEEDOR_OAUTH : proProvider;
+  const conProv0 = enOpenRouter ? PROVEEDOR_OAUTH : conProvider;
+  const proApiKey = keys[proProv0] ?? "";
+  const conApiKey = keys[conProv0] ?? "";
+  const conectado = (keys[PROVEEDOR_OAUTH] ?? "") !== "";
   const cambiarKey = (id: string, valor: string) => setKeys((k) => ({ ...k, [id]: valor }));
   const cambiarRecordar = (id: string, valor: boolean) => {
     setRecordar((r) => ({ ...r, [id]: valor }));
@@ -93,6 +104,42 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
     olvidarKey(id);
     setKeys((k) => ({ ...k, [id]: "" }));
     setRecordar((r) => ({ ...r, [id]: false }));
+  };
+
+  // Vuelta de OpenRouter: ?code=... se canjea una sola vez y la key queda como cualquier otra (sesión).
+  const [conexion, setConexion] = useState<{ estado: "libre" | "trabajando" | "error"; mensaje?: string }>(() => ({
+    estado: vieneDeOpenRouter() ? "trabajando" : "libre",
+  }));
+  useEffect(() => {
+    const canje = procesarVuelta(
+      window.location,
+      window.sessionStorage,
+      (nueva) => window.history.replaceState(null, "", nueva)
+    );
+    if (!canje) return;
+    let vivo = true;
+    canje.then((r) => {
+      if (!vivo) return;
+      if (r.ok) {
+        guardarKey(PROVEEDOR_OAUTH, r.key, { recordar: false });
+        setKeys((k) => ({ ...k, [PROVEEDOR_OAUTH]: r.key }));
+        setRecordar((x) => ({ ...x, [PROVEEDOR_OAUTH]: false }));
+        setConexion({ estado: "libre" });
+      } else {
+        setConexion({ estado: "error", mensaje: r.error });
+      }
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+  const conectar = async () => {
+    setConexion({ estado: "trabajando" });
+    try {
+      window.location.assign(await iniciarConexion(window.location, window.sessionStorage));
+    } catch {
+      setConexion({ estado: "error", mensaje: "No pudimos empezar la conexión con OpenRouter en este navegador." });
+    }
   };
 
   const [tokenTurnstile, setTokenTurnstile] = useState<string | null>(null);
@@ -109,15 +156,16 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
     return () => ac.abort();
   }, [modo]);
   const contador: EstadoContador = contadorPedido ?? { tipo: "cargando" };
-  const puedeEmpezar = puedeIniciar({ modo, tema: topic, verificado, contador });
+  const puedeEmpezar = puedeIniciar({ modo, tema: topic, verificado, contador, conectadoOpenRouter: conectado });
 
-  const proModel = modeloValido(proProvider, proModelRaw);
-  const conModel = modeloValido(conProvider, conModelRaw);
+  const proModel = modeloValido(proProv0, proModelRaw);
+  const conModel = modeloValido(conProv0, conModelRaw);
 
   const handleStart = () => {
     if (!puedeEmpezar) return;
     const proProv = proveedorDelModo(modo, proProvider);
     const conProv = proveedorDelModo(modo, conProvider);
+    const idsKey = enOpenRouter ? [PROVEEDOR_OAUTH] : [proProvider, conProvider];
     const gratis = modo === "gratis";
 
     saveConfig({
@@ -128,7 +176,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
       conProvider,
       conModel,
     });
-    for (const id of gratis ? [] : new Set([proProvider, conProvider])) {
+    for (const id of gratis ? [] : new Set(idsKey)) {
       if (getProviderById(id)?.requiresApiKey) {
         guardarKey(id, keys[id] ?? "", { recordar: recordar[id] ?? false });
       }
@@ -192,38 +240,44 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
           {modo === "gratis" && <ContadorGratis estado={contador} />}
 
           {modo === "openrouter" && (
-            <p className="config-aviso" role="status">
-              Conectar con OpenRouter llega pronto. Mientras tanto usa el modo Gratis o pon tu propia key.
-            </p>
+            <ConexionOpenRouter
+              conectado={conectado}
+              estado={conexion.estado}
+              mensaje={conexion.mensaje}
+              onConectar={conectar}
+              onDesconectar={() => desconectar(PROVEEDOR_OAUTH)}
+            />
           )}
 
-          {modo === "key" && (
+          {(modo === "key" || (modo === "openrouter" && conectado)) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <DebaterForm
               title="Defensor (PRO)"
               color="pro"
-              provider={proProvider}
+              provider={proProv0}
+              soloModelo={enOpenRouter}
               model={proModel}
               apiKey={proApiKey}
-              recordar={recordar[proProvider] ?? false}
+              recordar={recordar[proProv0] ?? false}
               onProviderChange={setProProvider}
               onModelChange={setProModel}
-              onApiKeyChange={(v) => cambiarKey(proProvider, v)}
-              onRecordarChange={(v) => cambiarRecordar(proProvider, v)}
-              onDesconectar={() => desconectar(proProvider)}
+              onApiKeyChange={(v) => cambiarKey(proProv0, v)}
+              onRecordarChange={(v) => cambiarRecordar(proProv0, v)}
+              onDesconectar={() => desconectar(proProv0)}
             />
             <DebaterForm
               title="Opositor (CON)"
               color="con"
-              provider={conProvider}
+              provider={conProv0}
+              soloModelo={enOpenRouter}
               model={conModel}
               apiKey={conApiKey}
-              recordar={recordar[conProvider] ?? false}
+              recordar={recordar[conProv0] ?? false}
               onProviderChange={setConProvider}
               onModelChange={setConModel}
-              onApiKeyChange={(v) => cambiarKey(conProvider, v)}
-              onRecordarChange={(v) => cambiarRecordar(conProvider, v)}
-              onDesconectar={() => desconectar(conProvider)}
+              onApiKeyChange={(v) => cambiarKey(conProv0, v)}
+              onRecordarChange={(v) => cambiarRecordar(conProv0, v)}
+              onDesconectar={() => desconectar(conProv0)}
             />
           </div>
           )}
@@ -247,7 +301,9 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
           </button>
 
           <p className="config-nota">
-            {modo === "key"
+            {modo === "openrouter"
+              ? "La key que te da OpenRouter se guarda solo en esta pestaña y se borra al cerrarla. Nunca se envía a ningún servidor propio."
+              : modo === "key"
               ? "Tu API key se guarda solo en esta pestaña y se borra al cerrarla, salvo que marques «Recordar en este dispositivo». Nunca se envía a ningún servidor propio."
               : "Sin key no guardamos nada tuyo: el servidor pone el modelo y el límite es por día."}
           </p>
@@ -261,6 +317,8 @@ interface DebaterFormProps {
   title: string;
   color: "pro" | "con";
   provider: string;
+  /** En «Conectar OpenRouter» el proveedor y la key ya están resueltos: solo se elige el modelo. */
+  soloModelo?: boolean;
   model: string;
   apiKey: string;
   recordar: boolean;
@@ -275,6 +333,7 @@ function DebaterForm({
   title,
   color,
   provider,
+  soloModelo,
   model,
   apiKey,
   recordar,
@@ -294,6 +353,7 @@ function DebaterForm({
         <h3 className="config-seccion-titulo">{title}</h3>
       </div>
 
+      {!soloModelo && (
       <div>
         <label className="config-etiqueta">Proveedor</label>
         <select
@@ -308,6 +368,7 @@ function DebaterForm({
           ))}
         </select>
       </div>
+      )}
 
       <div>
         <label className="config-etiqueta">Modelo</label>
@@ -324,7 +385,7 @@ function DebaterForm({
         </select>
       </div>
 
-      {providerConfig?.requiresApiKey && (
+      {!soloModelo && providerConfig?.requiresApiKey && (
         <div>
           <label className="config-etiqueta">API Key</label>
           <div className="flex gap-2">
@@ -372,7 +433,7 @@ function DebaterForm({
 
 const OPCIONES_MODO: { id: ModoConfig; titulo: string; detalle: string }[] = [
   { id: "gratis", titulo: "Gratis", detalle: "Sin key, con un límite por día" },
-  { id: "openrouter", titulo: "Conectar OpenRouter", detalle: OPENROUTER_DISPONIBLE ? "Con tu cuenta" : "Próximamente" },
+  { id: "openrouter", titulo: "Conectar OpenRouter", detalle: OPENROUTER_DISPONIBLE ? "Con tu cuenta, sin copiar keys" : "Próximamente" },
   { id: "key", titulo: "Mi key", detalle: "Usa tu propia API key" },
 ];
 
@@ -405,5 +466,43 @@ function ContadorGratis({ estado }: { estado: EstadoContador }) {
     <p className={`config-aviso${agotado ? " config-aviso-alerta" : ""}`} role="status" aria-live="polite">
       {textoContador(estado)}
     </p>
+  );
+}
+
+function ConexionOpenRouter(props: {
+  conectado: boolean;
+  estado: "libre" | "trabajando" | "error";
+  mensaje?: string;
+  onConectar: () => void;
+  onDesconectar: () => void;
+}) {
+  const { conectado, estado, mensaje, onConectar, onDesconectar } = props;
+  if (estado === "trabajando") {
+    return (
+      <p className="config-aviso" role="status" aria-live="polite">
+        Conectando con OpenRouter…
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {estado === "error" && (
+        <p className="config-aviso config-aviso-alerta" role="alert">
+          {mensaje}
+        </p>
+      )}
+      {conectado ? (
+        <p className="config-aviso" role="status">
+          Conectado con OpenRouter.{" "}
+          <button type="button" onClick={onDesconectar} className="underline">
+            Desconectar
+          </button>
+        </p>
+      ) : (
+        <button type="button" onClick={onConectar} className="config-iniciar">
+          Conectar con OpenRouter
+        </button>
+      )}
+    </div>
   );
 }
