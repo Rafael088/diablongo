@@ -2,6 +2,7 @@
 // Comprueba el catálogo de lib/providers.ts.
 // Uso: node scripts/comprobar-catalogo.ts [--en-linea]
 import { providers } from "../lib/providers.ts";
+import { MODELOS_GRATIS } from "../lib/gratis.ts";
 
 const errores: string[] = [];
 const afirmar = (c: boolean, m: string) => {
@@ -41,6 +42,11 @@ if (process.argv.includes("--en-linea")) {
     const r = await fetch("https://openrouter.ai/api/v1/models");
     afirmar(r.ok, `OpenRouter respondió ${r.status}`);
     const ids = new Set(((await r.json()) as { data: { id: string }[] }).data.map((m) => m.id));
+    for (const m of [...MODELOS_GRATIS.pro, ...MODELOS_GRATIS.con]) {
+      afirmar(m.endsWith(":free"), `gratis/${m}: no termina en :free`);
+      afirmar(ids.has(m), `gratis/${m}: no existe en OpenRouter`);
+      if (ids.has(m)) console.log(`en línea ok (gratis): ${m}`);
+    }
     for (const m of or?.models ?? []) {
       afirmar(ids.has(m), `openrouter/${m}: no existe en OpenRouter`);
       if (ids.has(m)) console.log(`en línea ok: ${m}`);

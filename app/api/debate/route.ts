@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { TurnResponse } from "@/types";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts";
 import { validarTurno } from "@/lib/validarTurno";
+import { MENSAJE_GRATIS_NO_DISPONIBLE, PROVEEDOR_GRATIS, elegirModeloGratis } from "@/lib/gratis";
 import { MAX_CUERPO_BYTES, MAX_TOKENS_RESPUESTA } from "@/lib/topes";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -26,8 +27,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!validacion.ok) {
       return NextResponse.json({ error: validacion.error }, { status: validacion.status });
     }
-    const { topic, role, phase, provider, model, apiKey, history, intervention } = validacion.datos;
+    const { topic, role, phase, provider, history, intervention } = validacion.datos;
+    let { model, apiKey } = validacion.datos;
     const providerId = provider.id;
+
+    // Modo gratis: key y modelo los pone el servidor. Sin key, 503 y no se llama a nada.
+    if (providerId === PROVEEDOR_GRATIS) {
+      const keyServidor = process.env.OPENROUTER_API_KEY;
+      const modeloGratis = elegirModeloGratis(role);
+      if (!keyServidor || !modeloGratis) {
+        return NextResponse.json({ error: MENSAJE_GRATIS_NO_DISPONIBLE }, { status: 503 });
+      }
+      apiKey = keyServidor;
+      model = modeloGratis;
+    }
 
     const systemPrompt = buildSystemPrompt(role);
     const userPrompt = buildUserPrompt(topic, role, phase, history, intervention);
@@ -39,6 +52,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         content = await callGemini(model, apiKey, systemPrompt, userPrompt);
         break;
       case "openrouter":
+      case PROVEEDOR_GRATIS:
       case "groq":
       case "ollama":
         content = await callOpenAICompatible(
@@ -102,7 +116,7 @@ async function callOpenAICompatible(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`API error (${response.status}): ${errorText}`);
+    throw new Error(`API error (${response.status}): ${apiKey ? errorText.split(apiKey).join("[oculta]") : errorText}`);
   }
 
   const data = await response.json();

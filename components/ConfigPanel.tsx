@@ -8,6 +8,7 @@ import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
 import { Swords, Settings2, Eye, EyeOff } from "lucide-react";
 import { AVISO_RECORDAR, estaRecordada, guardarKey, leerKey, olvidarKey } from "@/lib/keys";
 import { MAX_TEMA } from "@/lib/topes";
+import { PROVEEDOR_GRATIS } from "@/lib/gratis";
 
 interface ConfigPanelProps {
   onStart: (config: DebateConfig) => void;
@@ -40,19 +41,27 @@ function modeloValido(providerId: string, model: string): string {
 }
 
 // Un proveedor guardado que ya no está disponible (p. ej. ollama en producción) cae al primero.
-function proveedorValido(id: string | undefined, disponibles: ProviderConfig[]): string {
+// Modo «Gratis» (el servidor pone key y modelo): es el valor por defecto si la persona no tiene ninguna key guardada.
+function proveedorValido(
+  id: string | undefined,
+  disponibles: ProviderConfig[],
+  hayKeys: boolean
+): string {
+  if (id === PROVEEDOR_GRATIS) return PROVEEDOR_GRATIS;
+  if (!hayKeys) return PROVEEDOR_GRATIS;
   return disponibles.find((p) => p.id === id)?.id ?? disponibles[0].id;
 }
 
 function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig | null }) {
   const disponibles = proveedoresDisponibles();
   const porDefecto = disponibles[0];
+  const hayKeys = disponibles.some((p) => leerKey(p.id) !== "");
   const [topic, setTopic] = useState((saved?.topic ?? "").slice(0, MAX_TEMA));
 
-  const [proProvider, setProProvider] = useState(proveedorValido(saved?.proProvider, disponibles));
+  const [proProvider, setProProvider] = useState(proveedorValido(saved?.proProvider, disponibles, hayKeys));
   const [proModelRaw, setProModel] = useState(saved?.proModel ?? porDefecto.models[0]);
 
-  const [conProvider, setConProvider] = useState(proveedorValido(saved?.conProvider, disponibles));
+  const [conProvider, setConProvider] = useState(proveedorValido(saved?.conProvider, disponibles, hayKeys));
   const [conModelRaw, setConModel] = useState(saved?.conModel ?? porDefecto.models[1]);
 
   // Una key por proveedor (si Ángel y Diablo usan el mismo, comparten key).
@@ -98,16 +107,16 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
     const pro: DebaterConfig = {
       role: "pro",
       provider: proProvider,
-      model: proModel,
-      apiKey: proApiKey,
+      model: proProvider === PROVEEDOR_GRATIS ? "" : proModel,
+      apiKey: proProvider === PROVEEDOR_GRATIS ? "" : proApiKey,
       name: "PRO",
     };
 
     const con: DebaterConfig = {
       role: "con",
       provider: conProvider,
-      model: conModel,
-      apiKey: conApiKey,
+      model: conProvider === PROVEEDOR_GRATIS ? "" : conModel,
+      apiKey: conProvider === PROVEEDOR_GRATIS ? "" : conApiKey,
       name: "CON",
     };
 
@@ -238,6 +247,7 @@ function DebaterForm({
           onChange={(e) => onProviderChange(e.target.value)}
           className="config-campo"
         >
+          <option value={PROVEEDOR_GRATIS}>Gratis (sin key)</option>
           {proveedoresDisponibles().map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -246,6 +256,13 @@ function DebaterForm({
         </select>
       </div>
 
+      {provider === PROVEEDOR_GRATIS && (
+        <p className="text-xs opacity-70">
+          Sin key: el modelo lo elige el servidor entre modelos gratuitos.
+        </p>
+      )}
+
+      {provider !== PROVEEDOR_GRATIS && (
       <div>
         <label className="config-etiqueta">Modelo</label>
         <select
@@ -260,6 +277,7 @@ function DebaterForm({
           ))}
         </select>
       </div>
+      )}
 
       {providerConfig?.requiresApiKey && (
         <div>

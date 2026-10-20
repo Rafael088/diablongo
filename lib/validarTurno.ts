@@ -1,6 +1,7 @@
 import { FASES } from "../types/index.ts";
 import type { DebateMessage, DebatePhase, DebateRole, ProviderConfig } from "../types/index.ts";
 import { getProviderById } from "./providers.ts";
+import { PROVEEDOR_GRATIS, proveedorGratis } from "./gratis.ts";
 import {
   MAX_INTERVENCION,
   MAX_INTERVENCIONES_USUARIO,
@@ -58,16 +59,20 @@ export function validarTurno(body: unknown, ...args: [entorno?: string]): Result
     return fallo("La fase indicada no es válida.");
   }
   if (typeof providerId !== "string") return fallo("Falta el proveedor.");
-  const provider = getProviderById(providerId, ...args);
+  // Modo gratis: model y apiKey del cliente se ignoran (ni se validan); el servidor decide ambos.
+  const esGratis = providerId === PROVEEDOR_GRATIS;
+  const provider = esGratis ? proveedorGratis : getProviderById(providerId, ...args);
   if (!provider) return fallo("El proveedor indicado no está permitido.");
-  if (typeof model !== "string" || !provider.models.includes(model)) {
-    return fallo("El modelo indicado no está permitido para ese proveedor.");
-  }
-  if (apiKey !== undefined && typeof apiKey !== "string") {
-    return fallo("La clave de API no es válida.");
-  }
-  if (provider.requiresApiKey && !apiKey) {
-    return fallo("Falta la clave de API de ese proveedor.");
+  if (!esGratis) {
+    if (typeof model !== "string" || !provider.models.includes(model)) {
+      return fallo("El modelo indicado no está permitido para ese proveedor.");
+    }
+    if (apiKey !== undefined && typeof apiKey !== "string") {
+      return fallo("La clave de API no es válida.");
+    }
+    if (provider.requiresApiKey && !apiKey) {
+      return fallo("Falta la clave de API de ese proveedor.");
+    }
   }
 
   let historial: DebateMessage[] = [];
@@ -111,8 +116,8 @@ export function validarTurno(body: unknown, ...args: [entorno?: string]): Result
       role: role as DebateRole,
       phase: phase as DebatePhase,
       provider,
-      model,
-      apiKey: typeof apiKey === "string" ? apiKey : "",
+      model: esGratis ? "" : (model as string),
+      apiKey: !esGratis && typeof apiKey === "string" ? apiKey : "",
       history: historial,
       intervention: intervention as string | undefined,
     },
