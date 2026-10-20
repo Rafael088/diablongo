@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DebateConfig } from "@/types";
 import ConfigPanel from "@/components/ConfigPanel";
 import DebateArena from "@/components/DebateArena";
+import Cuenta from "@/components/Cuenta";
 
 export default function Home() {
   const [config, setConfig] = useState<DebateConfig | null>(null);
@@ -22,12 +23,15 @@ export default function Home() {
           }}
         />
       ) : (
-        <ConfigPanel
-          onStart={(nueva, token) => {
-            setTurnstile(token);
-            setConfig(nueva);
-          }}
-        />
+        <>
+          <Cuenta />
+          <ConfigPanel
+            onStart={(nueva, token) => {
+              setTurnstile(token);
+              setConfig(nueva);
+            }}
+          />
+        </>
       )}
     </main>
   );
