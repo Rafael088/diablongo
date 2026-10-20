@@ -25,7 +25,14 @@ const config: DebateConfig = {
   con: { role: "con", provider: "demo", model: "demo", apiKey: "", name: "Diablo" },
 };
 
-const generate: GenerateTurn = async ({ history }) => {
+/** Desenlaces fijos de ejemplo para ?final=pro y ?final=con (no llaman al servidor). */
+const DESENLACES = {
+  pro: "Elegiste al Angelito: casa, pijama y cero tráfico. Tu espalda te da las gracias.",
+  con: "Elegiste al Diablito: rines 17 instalados. Tu bolsillo llora.",
+} as const;
+
+const generate: GenerateTurn = async ({ history, phase, speaker }) => {
+  if (phase === "desenlace") return DESENLACES[speaker];
   await new Promise((r) => setTimeout(r, 700));
   const jugados = history.filter((m) => m.role !== "user").length;
   return FRASES[jugados] ?? "...";
@@ -58,17 +65,21 @@ function Demo() {
   const turno = Number(params.get("turno"));
   const g = params.get("ganador");
   const ganador = g === "pro" || g === "con" ? g : undefined;
+  const final = params.get("final");
+  const eleccionFinal = final === "pro" || final === "con" ? final : undefined;
   const golpe = params.get("golpe");
   const golpeFijo = golpe === "pro" || golpe === "con" ? golpe : undefined;
   // ?ganador= y ?golpe= imponen su propio turno congelado (el final o el 4).
-  const turnoFinal = ganador ? 8 : golpeFijo ? 4 : turno;
+  const turnoFinal = ganador || final ? 8 : golpeFijo ? 4 : turno;
   const congelada = Number.isInteger(turnoFinal) && turnoFinal >= 1 && turnoFinal <= 8;
+  // ?final=1 deja la pantalla de elección; sin ?votos= el Diablo va ganando.
+  const votosParam = params.get("votos") ?? (final ? "con,con,pro" : null);
   const votosIniciales = congelada
-    ? indicesDeVotos(params.get("votos"), mensajesHasta(turnoFinal))
+    ? indicesDeVotos(votosParam, mensajesHasta(turnoFinal))
     : undefined;
   return (
     <DebateArena
-      key={congelada ? `${turnoFinal}${ganador ?? ""}${golpeFijo ?? ""}${params.get("votos") ?? ""}` : "viva"}
+      key={congelada ? `${turnoFinal}${ganador ?? ""}${golpeFijo ?? ""}${votosParam ?? ""}${final ?? ""}` : "viva"}
       config={config}
       onReset={() => router.push("/arena-demo")}
       generate={generate}
@@ -76,8 +87,15 @@ function Demo() {
       ganador={ganador}
       golpeFijo={golpeFijo}
       votosIniciales={votosIniciales}
+      eleccionInicial={eleccionFinal}
+      desenlaceInicial={eleccionFinal ? DESENLACES[eleccionFinal] : undefined}
+      volcadoTarjeta={params.get("volcado") === "1"}
       {...(congelada
-        ? { initialMessages: mensajesHasta(turnoFinal), initialStatus: "paused" as const, instant: true }
+        ? {
+            initialMessages: mensajesHasta(turnoFinal),
+            initialStatus: final ? ("finished" as const) : ("paused" as const),
+            instant: true,
+          }
         : {})}
     />
   );

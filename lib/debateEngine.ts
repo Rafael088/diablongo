@@ -35,6 +35,15 @@ import type { DebateMessage, DebatePhase, DebateRole } from "@/types";
 export const TOTAL_TURNS = 8;
 export const INTERVENTION_AFTER_TURN = 4;
 
+/**
+ * Llamadas a modelos de un debate completo: los 8 turnos más la LLAMADA 9, el
+ * desenlace de la tarjeta final (fase "desenlace", la escribe el personaje que
+ * el usuario eligió). Cuenta dentro del mismo debate para los límites del modo
+ * gratis. Si esa llamada falla o tarda más de ~8 s se usa una plantilla local,
+ * pero igual se cuenta como intentada.
+ */
+export const TOTAL_LLAMADAS = TOTAL_TURNS + 1;
+
 export interface Turn {
   /** posición en el plan, empezando en 0 */
   index: number;

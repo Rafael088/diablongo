@@ -13,7 +13,7 @@ import { blipAlAvanzar, getBaseFrequency, playBlip } from "@/lib/blips";
 import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
 import PersonajeAnimado from "./PersonajeAnimado";
 import { MINIMO, TOPE, quienGana, textoGanando, valorDeVotos, type Ganando } from "@/lib/tentacion";
-import SummaryPanel from "./SummaryPanel";
+import TarjetaDesenlace from "./TarjetaDesenlace";
 
 interface DebateArenaProps {
   config: DebateConfig;
@@ -33,6 +33,11 @@ interface DebateArenaProps {
   votosIniciales?: number[];
   /** Avisa de quién va ganando en la barra de tentación y su valor (-100 a 100). */
   onTentacionChange?: (estado: { valor: number; ganando: Ganando }) => void;
+  /** Demo y capturas: arranca con esta elección ya hecha y su desenlace fijo. */
+  eleccionInicial?: Bando;
+  desenlaceInicial?: string;
+  /** Capturas: la tarjeta escribe su PNG real en la página. */
+  volcadoTarjeta?: boolean;
 }
 
 const NOMBRES: Record<DebateRole | "user", string> = {
@@ -55,10 +60,13 @@ export default function DebateArena({
   initialStatus,
   instant = false,
   persist = true,
-  ganador,
+  ganador: ganadorProp,
   golpeFijo,
   votosIniciales,
   onTentacionChange,
+  eleccionInicial,
+  desenlaceInicial,
+  volcadoTarjeta = false,
 }: DebateArenaProps) {
   const debate = useDebate(config, { generate, initialMessages, initialStatus, persist });
   const { messages, status, thinking, error, textRead } = debate;
@@ -66,6 +74,10 @@ export default function DebateArena({
   const soundEnabled = useSoundEnabled();
   const prevBlipRef = useRef({ text: "", count: 0 });
   const quieto = useReducedMotion() ?? false;
+  // Pantalla final: a quién hizo caso el usuario y el desenlace de la tarjeta.
+  const [eleccion, setEleccion] = useState<Bando | null>(eleccionInicial ?? null);
+  const [desenlace, setDesenlace] = useState<string | null>(desenlaceInicial ?? null);
+  const ganadorFinal: Bando | undefined = ganadorProp ?? eleccion ?? undefined;
   // Votos 👍 por índice de mensaje.
   const [votos, setVotos] = useState<number[]>(votosIniciales ?? []);
 
@@ -132,7 +144,7 @@ export default function DebateArena({
   const habla: FotogramaSprite = bocaAbierta || (speaker !== null && thinking) ? "hablar" : "reposo";
 
   const frameDe = (quien: DebateRole): FotogramaSprite =>
-    ganador === quien
+    ganadorFinal === quien
       ? "victoria"
       : golpe === quien
         ? "golpe"
@@ -202,15 +214,15 @@ export default function DebateArena({
     debate.play();
   };
 
-  if (finished && done) {
-    return (
-      <div className="w-full max-w-4xl mx-auto p-4">
-        <SummaryPanel messages={messages} topic={config.topic} onNewDebate={handleReset} />
-      </div>
-    );
-  }
+  const enFinal = finished && done;
+  const elegir = async (quien: Bando) => {
+    if (eleccion) return;
+    setEleccion(quien);
+    // LLAMADA 9 (o plantilla local si falla o tarda); la caja muestra "..." mientras tanto.
+    setDesenlace(await debate.pedirDesenlace(quien));
+  };
 
-  const cajaClicable = !done;
+  const cajaClicable = !done && !enFinal;
   const nombreCaja = speaker ? NOMBRES[speaker] : "";
 
   return (
@@ -231,8 +243,8 @@ export default function DebateArena({
             nombre={NOMBRES[quien]}
             claseNombre={`arena-nombre-${quien}`}
             activo={
-              ganador
-                ? ganador === quien
+              ganadorFinal
+                ? ganadorFinal === quien
                 : speaker === null ||
                   speaker === quien ||
                   (quien === "user" && waitingIntervention)
@@ -240,7 +252,7 @@ export default function DebateArena({
             desfase={quien === "pro" ? 0 : quien === "user" ? 0.9 : 1.7}
             golpeado={golpe === quien}
             golpeQuieto={golpeFijo === quien}
-            victorioso={ganador === quien}
+            victorioso={ganadorFinal === quien}
           />
         ))}
       </div>
@@ -283,6 +295,35 @@ export default function DebateArena({
             <button className="caja-boton" onClick={debate.play}>
               Iniciar
             </button>
+          </div>
+        ) : enFinal ? (
+          <div className="caja-eleccion">
+            {!eleccion ? (
+              <>
+                <p className="caja-pregunta">* ¿A quién le haces caso?</p>
+                <div className="caja-botones">
+                  {(["pro", "con"] as const).map((quien) => (
+                    <button
+                      key={quien}
+                      className={`caja-boton${ganando === quien ? " caja-boton-sugerido" : ""}`}
+                      onClick={() => elegir(quien)}
+                      aria-label={
+                        ganando === quien
+                          ? `Hacer caso al ${NOMBRES[quien]} (iba ganando en la barra)`
+                          : `Hacer caso al ${NOMBRES[quien]}`
+                      }
+                    >
+                      {quien === "pro" ? "😇 Al Ángel" : "😈 Al Diablo"}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={`caja-nombre arena-nombre-${eleccion}`}>{NOMBRES[eleccion]}</div>
+                <p className="caja-texto">{desenlace ?? "..."}</p>
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -342,6 +383,16 @@ export default function DebateArena({
           </div>
         )}
       </div>
+
+      {enFinal && eleccion && desenlace && (
+        <TarjetaDesenlace
+          tema={config.topic}
+          desenlace={desenlace}
+          ganador={eleccion}
+          onJugarOtra={handleReset}
+          volcado={volcadoTarjeta}
+        />
+      )}
 
       <div className="arena-barra">
         {(status === "running" || status === "paused") && !waitingIntervention && !error && (

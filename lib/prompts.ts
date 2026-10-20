@@ -2,6 +2,8 @@ import type { DebateMessage, DebatePhase, DebateRole, MessageRole } from "@/type
 
 // Ids internos: "pro" = Ángel, "con" = Diablo.
 export const MAX_WORDS = 35;
+/** Tope de palabras del desenlace de la tarjeta final (llamada 9). */
+export const MAX_WORDS_DESENLACE = 20;
 
 function roleLabel(role: MessageRole): string {
   if (role === "user") return "USUARIO";
@@ -66,6 +68,13 @@ export function buildUserPrompt(
     prompt += `El usuario habló (aparece como [USUARIO] arriba) y te toca responderle: "${intervention}"\n\n`;
   }
 
+  if (phase === "desenlace") {
+    // Llamada 9: ignora las reglas de refutar; solo el desenlace corto.
+    prompt += phaseInstruction(phase, role);
+    prompt += ` Recuerda: máximo ${MAX_WORDS_DESENLACE} palabras.`;
+    return prompt;
+  }
+
   prompt += intervention
     ? `Responde directo a lo que dijo el usuario, a favor de ${sideOf(role)}, y si el otro habló antes, refuta eso también.`
     : phaseInstruction(phase, role);
@@ -86,6 +95,8 @@ function phaseNameInSpanish(phase: DebatePhase): string {
       return "Última palabra";
     case "intervention":
       return "Respuesta al usuario";
+    case "desenlace":
+      return "Desenlace final";
     default:
       return phase;
   }
@@ -111,6 +122,10 @@ function phaseInstruction(phase: DebatePhase, role: DebateRole): string {
       return `Di tu última palabra: una frase que cierre a favor de ${side}, replicando lo último del otro.`;
     case "intervention":
       return `Responde directo a lo que dijo el usuario, a favor de ${side}, y si el otro habló antes, refuta eso también.`;
+    case "desenlace": {
+      const elegido = role === "pro" ? "Angelito" : "Diablito";
+      return `El debate terminó y el usuario te eligió a TI (${roleLabel(role)}). Escribe el desenlace de su decisión sobre el tema, en tercera persona dirigido al usuario, con tu tono y con humor, mencionando el tema. Máximo ${MAX_WORDS_DESENLACE} palabras, en 1 o 2 frases cortas, sin comillas ni saludos. Estilo: «Elegiste al ${elegido}: rines 17 instalados. Tu bolsillo llora.» Si el tema es delicado, el desenlace debe ser amable y serio, sin nada dañino ni tentador.`;
+    }
     default:
       return `Argumenta a favor de ${side}.`;
   }

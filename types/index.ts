@@ -31,7 +31,9 @@ export type DebatePhase =
   | "rebuttal"
   | "counter"
   | "closing"
-  | "intervention";
+  | "intervention"
+  /** Fase 9: el personaje elegido escribe el desenlace de la tarjeta final. */
+  | "desenlace";
 
 export interface DebateConfig {
   topic: string;

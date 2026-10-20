@@ -11,6 +11,11 @@ import {
   shouldPauseForIntervention,
 } from "@/lib/debateEngine";
 import { saveDebate } from "@/lib/storage";
+import {
+  TIEMPO_MAX_DESENLACE_MS,
+  limpiarDesenlace,
+  plantillaDesenlace,
+} from "@/lib/desenlace";
 
 export type DebateStatus = "idle" | "running" | "paused" | "finished";
 
@@ -234,5 +239,57 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
     statusRef.current = "idle";
   }, []);
 
-  return { messages, status, thinking, error, play, pause, intervene, textRead, stop };
+  /**
+   * LLAMADA 9: el personaje elegido escribe el desenlace de la tarjeta. Si
+   * falla, viene vacío o tarda más de TIEMPO_MAX_DESENLACE_MS, devuelve la
+   * plantilla local. Nunca lanza error y no toca los mensajes del debate.
+   */
+  const pedirDesenlace = useCallback(
+    async (elegido: DebateRole): Promise<string> => {
+      const debater = elegido === "pro" ? config.pro : config.con;
+      const control = new AbortController();
+      const reloj = setTimeout(() => control.abort(), TIEMPO_MAX_DESENLACE_MS);
+      const limite = new Promise<never>((_, rechazar) => {
+        control.signal.addEventListener("abort", () => rechazar(new Error("tiempo")));
+      });
+      try {
+        const pedir = async (): Promise<string> => {
+          if (generate) {
+            return generate({
+              speaker: elegido,
+              phase: "desenlace",
+              round: 4,
+              history: messagesRef.current,
+            });
+          }
+          const response = await fetch("/api/debate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: control.signal,
+            body: JSON.stringify({
+              topic: config.topic,
+              role: elegido,
+              phase: "desenlace",
+              provider: debater.provider,
+              model: debater.model,
+              apiKey: debater.apiKey,
+              history: messagesRef.current,
+            }),
+          });
+          if (!response.ok) throw new Error(`Error ${response.status}`);
+          return (await response.json()).content;
+        };
+        const texto = limpiarDesenlace(await Promise.race([pedir(), limite]));
+        if (!texto || texto === "No response") throw new Error("vacío");
+        return texto;
+      } catch {
+        return plantillaDesenlace(config.topic, elegido);
+      } finally {
+        clearTimeout(reloj);
+      }
+    },
+    [config, generate]
+  );
+
+  return { messages, status, thinking, error, play, pause, intervene, textRead, stop, pedirDesenlace };
 }
