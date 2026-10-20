@@ -61,3 +61,69 @@ input[type="range"]::-webkit-slider-thumb {
 input[type="range"]::-webkit-slider-thumb:hover {
   background: #818cf8;
 }
+
+/* Arena de Ángel contra Diablo. Colores en variables para la tarea de paleta. */
+:root {
+  --arena-fondo: #14121c;
+  --arena-texto: #fafafa;
+  --arena-tenue: #a1a1aa;
+  --caja-fondo: #000000;
+  --caja-borde: #ffffff;
+  --caja-texto: #ffffff;
+  --nombre-pro: #fde68a;
+  --nombre-con: #fb7185;
+  --nombre-user: #7dd3fc;
+  --arena-error: #fca5a5;
+  --arena-fuente: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace;
+}
+
+.arena { font-family: var(--arena-fuente); color: var(--arena-texto); }
+.arena-titulo { font-size: 1.1rem; font-weight: 700; }
+.arena-sub { font-size: 0.8rem; color: var(--arena-tenue); }
+.arena-escenario {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 8px; padding: 12px 8px; margin-bottom: 12px;
+  background: var(--arena-fondo);
+}
+.arena-personaje { width: 30%; max-width: 160px; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: opacity 0.2s; }
+.arena-personaje:nth-child(2) { width: 24%; max-width: 128px; }
+.arena-apagado { opacity: 0.55; }
+.arena-nombre { font-size: 0.8rem; font-weight: 700; }
+.arena-nombre-pro { color: var(--nombre-pro); }
+.arena-nombre-con { color: var(--nombre-con); }
+.arena-nombre-user { color: var(--nombre-user); }
+
+.caja-dialogo {
+  position: relative; min-height: 8.5rem; padding: 14px 16px;
+  background: var(--caja-fondo); color: var(--caja-texto);
+  border: 4px solid var(--caja-borde); border-radius: 0;
+  font-size: 1rem; line-height: 1.5;
+}
+.caja-nombre { font-weight: 700; margin-bottom: 4px; }
+.caja-texto { white-space: pre-wrap; }
+.caja-cursor { display: inline-block; width: 0.6em; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: var(--caja-texto); }
+.caja-flecha { position: absolute; right: 12px; bottom: 6px; font-size: 0.8rem; }
+.caja-centro { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 6rem; text-align: center; }
+.caja-error { margin-top: 8px; color: var(--arena-error); font-size: 0.85rem; }
+.caja-intervencion { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.caja-pregunta { color: var(--nombre-user); }
+.caja-campo {
+  width: 100%; padding: 8px 10px; background: var(--caja-fondo); color: var(--caja-texto);
+  border: 2px solid var(--caja-borde); border-radius: 0; font: inherit; font-size: 0.95rem;
+}
+.caja-campo:focus { outline: 2px solid var(--nombre-pro); outline-offset: 2px; }
+.caja-botones { display: flex; gap: 12px; }
+.caja-boton {
+  padding: 6px 16px; background: var(--caja-fondo); color: var(--caja-texto);
+  border: 2px solid var(--caja-borde); font: inherit; cursor: pointer;
+}
+.caja-boton:hover:not(:disabled) { background: var(--caja-borde); color: var(--caja-fondo); }
+.caja-boton:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.arena-barra { display: flex; justify-content: center; gap: 20px; margin-top: 10px; }
+.arena-enlace { color: var(--arena-tenue); font-size: 0.85rem; text-decoration: underline; }
+.arena-enlace:hover { color: var(--arena-texto); }
+.arena-historial { margin-top: 14px; font-size: 0.85rem; color: var(--arena-tenue); }
+.arena-historial summary { cursor: pointer; }
+.arena-historial ol { margin-top: 8px; padding-left: 1.2em; list-style: decimal; display: flex; flex-direction: column; gap: 6px; max-height: 14rem; overflow-y: auto; }
+.arena-vacio { margin-top: 8px; }

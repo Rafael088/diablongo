@@ -1,266 +1,251 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
 import { DebateConfig, DebateMessage, DebateRole } from "@/types";
-import {
-  TOTAL_TURNS,
-  canIntervene,
-  countTurnsPlayed,
-  getTurn,
-  pendingIntervention,
-  shouldPauseForIntervention,
-} from "@/lib/debateEngine";
-import { saveDebate } from "@/lib/storage";
-import DebaterCard from "./DebaterCard";
-import ArgumentBubble from "./ArgumentBubble";
-import DebateControls from "./DebateControls";
+import { TOTAL_TURNS, canIntervene, countTurnsPlayed, getTurn } from "@/lib/debateEngine";
+import { useDebate, type DebateStatus, type GenerateTurn } from "@/hooks/useDebate";
+import { useTypewriter } from "@/hooks/useTypewriter";
+import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
+import PixelSprite from "./PixelSprite";
 import SummaryPanel from "./SummaryPanel";
 
 interface DebateArenaProps {
   config: DebateConfig;
   onReset: () => void;
+  /** Modo demo: texto fijo en lugar de llamar al servidor. */
+  generate?: GenerateTurn;
+  initialMessages?: DebateMessage[];
+  initialStatus?: DebateStatus;
+  /** Texto completo sin efecto de máquina de escribir (capturas). */
+  instant?: boolean;
+  persist?: boolean;
 }
 
-export default function DebateArena({ config, onReset }: DebateArenaProps) {
-  const [messages, setMessages] = useState<DebateMessage[]>([]);
-  const [status, setStatus] = useState<"idle" | "running" | "paused" | "finished">("idle");
-  const [currentTurn, setCurrentTurn] = useState<{ phase: string; round: number; speaker: DebateRole } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const NOMBRES: Record<DebateRole | "user", string> = {
+  pro: "Ángel",
+  con: "Diablo",
+  user: "Tú",
+};
 
-  const pendingRef = useRef(false);
-  const messagesRef = useRef<DebateMessage[]>([]);
-  const statusRef = useRef<"idle" | "running" | "paused" | "finished">("idle");
-  const runNextTurnRef = useRef<() => void>(() => {});
+const PERSONAJE: Record<DebateRole | "user", PersonajeSprite> = {
+  pro: "pro",
+  con: "con",
+  user: "usuario",
+};
 
-  // El estado y su ref cambian siempre juntos (los refs no se tocan al renderizar).
-  const updateStatus = useCallback((next: "idle" | "running" | "paused" | "finished") => {
-    statusRef.current = next;
-    setStatus(next);
-  }, []);
-
-  const executeTurn = useCallback(
-    async (speaker: DebateRole, phase: string, round: number): Promise<boolean> => {
-      const debater = speaker === "pro" ? config.pro : config.con;
-      setCurrentTurn({ speaker, phase, round });
-      setError(null);
-
-      try {
-        // Lo que el usuario dijo y este personaje aún no contestó (va también en el historial).
-        const intervention = pendingIntervention(messagesRef.current, speaker);
-        const response = await fetch("/api/debate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            topic: config.topic,
-            role: speaker,
-            phase,
-            provider: debater.provider,
-            model: debater.model,
-            apiKey: debater.apiKey,
-            history: messagesRef.current,
-            intervention,
-          }),
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || `Error ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        const newMessage: DebateMessage = {
-          role: speaker,
-          content: data.content,
-          round,
-          phase: phase as DebateMessage["phase"],
-        };
-
-        const updated = [...messagesRef.current, newMessage];
-        setMessages(updated);
-        messagesRef.current = updated;
-        return true;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Error desconocido";
-        setError(message);
-        updateStatus("paused");
-        pendingRef.current = false;
-        return false;
-      }
-    },
-    [config, updateStatus]
+function Personaje({
+  quien,
+  fotograma,
+  activo,
+}: {
+  quien: DebateRole | "user";
+  fotograma: FotogramaSprite;
+  activo: boolean;
+}) {
+  return (
+    <div className={`arena-personaje ${activo ? "" : "arena-apagado"}`}>
+      <PixelSprite
+        personaje={PERSONAJE[quien]}
+        fotograma={fotograma}
+        escala={4}
+        className="w-full h-auto"
+      />
+      <span className={`arena-nombre arena-nombre-${quien}`}>{NOMBRES[quien]}</span>
+    </div>
   );
+}
 
-  const runNextTurn = useCallback(async () => {
-    if (pendingRef.current) return;
-    pendingRef.current = true;
+export default function DebateArena({
+  config,
+  onReset,
+  generate,
+  initialMessages,
+  initialStatus,
+  instant = false,
+  persist = true,
+}: DebateArenaProps) {
+  const debate = useDebate(config, { generate, initialMessages, initialStatus, persist });
+  const { messages, status, thinking, error, textRead } = debate;
+  const [interventionText, setInterventionText] = useState("");
 
-    const turnsDone = countTurnsPlayed(messagesRef.current);
-    const turn = getTurn(turnsDone);
-    if (!turn) {
-      pendingRef.current = false;
-      return;
-    }
+  const last = messages.length > 0 ? messages[messages.length - 1] : null;
+  const turnsPlayed = countTurnsPlayed(messages);
+  const nextSpeaker = getTurn(turnsPlayed)?.nextSpeaker ?? null;
 
-    // La intervención ya está en el historial y executeTurn la manda a este
-    // personaje si aún no la contestó: no suma llamadas.
-    const success = await executeTurn(turn.nextSpeaker, turn.phase, turn.round);
-
-    if (!success) {
-      pendingRef.current = false;
-      return;
-    }
-
-    const done = countTurnsPlayed(messagesRef.current);
-    const next = getTurn(done);
-
-    if (!next) {
-      updateStatus("finished");
-      pendingRef.current = false;
-      saveDebate({
-        id: Date.now().toString(),
-        topic: config.topic,
-        totalTurns: TOTAL_TURNS,
-        currentRound: turn.round,
-        messages: messagesRef.current,
-        status: "finished" as const,
-      });
-      return;
-    }
-
-    setCurrentTurn({
-      speaker: next.nextSpeaker,
-      phase: next.phase,
-      round: next.round,
-    });
-
-    if (shouldPauseForIntervention(done)) {
-      // Mitad del debate: pausa para que el usuario pueda intervenir.
-      updateStatus("paused");
-      pendingRef.current = false;
-      return;
-    }
-
-    pendingRef.current = false;
-
-    if (statusRef.current === "running") {
-      setTimeout(() => {
-        if (statusRef.current === "running") {
-          runNextTurnRef.current();
-        }
-      }, 1200);
-    }
-  }, [config.topic, executeTurn, updateStatus]);
+  // Frase que se muestra en la caja: la última dicha por un personaje, o la
+  // intervención del usuario recién hecha.
+  const lineText = thinking ? "..." : last?.content ?? "";
+  const { shown, done, skip } = useTypewriter(lineText, instant || thinking);
 
   useEffect(() => {
-    runNextTurnRef.current = runNextTurn;
-  }, [runNextTurn]);
+    if (done && !thinking) textRead();
+  }, [done, thinking, lineText, textRead]);
 
-  const handlePlayPause = () => {
-    if (status === "running") {
-      updateStatus("paused");
-    } else {
-      updateStatus("running");
-      setTimeout(() => runNextTurnRef.current(), 100);
-    }
-  };
-
-  // La intervención no llama al modelo: queda en el historial como mensaje del
-  // usuario y el siguiente turno de cada personaje le responde.
-  const handleIntervene = (text: string) => {
-    const clean = text.trim();
-    if (!clean || !canIntervene(countTurnsPlayed(messagesRef.current))) return;
-    const userMessage: DebateMessage = {
-      role: "user",
-      content: clean,
-      round: getTurn(countTurnsPlayed(messagesRef.current))?.round ?? 0,
-      phase: "intervention",
+  // Clic o tecla para completar la frase al instante.
+  useEffect(() => {
+    if (done) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        skip();
+      }
     };
-    const updated = [...messagesRef.current, userMessage];
-    messagesRef.current = updated;
-    setMessages(updated);
-  };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [done, skip]);
+
+  const waitingIntervention =
+    status === "paused" &&
+    !error &&
+    done &&
+    !thinking &&
+    last?.role !== "user" &&
+    turnsPlayed === 4 &&
+    canIntervene(turnsPlayed);
+
+  const speaker: DebateRole | "user" | null = thinking
+    ? nextSpeaker
+    : last && status !== "idle"
+      ? (last.role as DebateRole | "user")
+      : null;
+  const finished = status === "finished";
+  const hablando = !finished && speaker !== null && !done;
+  // Alterna reposo/hablar según se escribe, para simular la boca.
+  const bocaAbierta = hablando && Math.floor(shown.length / 3) % 2 === 0;
+  const habla: FotogramaSprite = bocaAbierta || (speaker !== null && thinking) ? "hablar" : "reposo";
+
+  const frameDe = (quien: DebateRole): FotogramaSprite =>
+    !finished && speaker === quien ? habla : "reposo";
+  const frameUsuario: FotogramaSprite = waitingIntervention
+    ? "pensar"
+    : !finished && last?.role === "user" && speaker === "user"
+      ? "decidir"
+      : "reposo";
 
   const handleReset = () => {
-    pendingRef.current = false;
+    debate.stop();
     onReset();
   };
 
-  if (status === "finished") {
+  const decir = () => {
+    const text = interventionText.trim();
+    if (!text) return;
+    debate.intervene(text);
+    setInterventionText("");
+    debate.play();
+  };
+
+  if (finished && done) {
     return (
       <div className="w-full max-w-4xl mx-auto p-4">
-        <SummaryPanel
-          messages={messages}
-          topic={config.topic}
-          onNewDebate={handleReset}
-        />
+        <SummaryPanel messages={messages} topic={config.topic} onNewDebate={handleReset} />
       </div>
     );
   }
 
+  const cajaClicable = !done;
+  const nombreCaja = speaker ? NOMBRES[speaker] : "";
+
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 space-y-6">
-      <div className="text-center mb-4">
-        <h2 className="text-xl md:text-2xl font-bold text-white mb-2">{config.topic}</h2>
-        <p className="text-zinc-400 text-sm">
-          {TOTAL_TURNS} turnos · {config.pro.model} vs {config.con.model}
+    <div className="arena w-full max-w-3xl mx-auto">
+      <div className="text-center mb-3">
+        <h2 className="arena-titulo">{config.topic}</h2>
+        <p className="arena-sub">
+          Turno {Math.min(turnsPlayed + (thinking ? 1 : 0), TOTAL_TURNS)} de {TOTAL_TURNS}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DebaterCard
-          config={config.pro}
-          isActive={currentTurn?.speaker === "pro"}
-          color="emerald"
-        />
-        <DebaterCard
-          config={config.con}
-          isActive={currentTurn?.speaker === "con"}
-          color="rose"
-        />
+      <div className="arena-escenario">
+        <Personaje quien="pro" fotograma={frameDe("pro")} activo={speaker === null || speaker === "pro"} />
+        <Personaje quien="user" fotograma={frameUsuario} activo={speaker === null || speaker === "user" || waitingIntervention} />
+        <Personaje quien="con" fotograma={frameDe("con")} activo={speaker === null || speaker === "con"} />
       </div>
 
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-6 min-h-[300px] max-h-[600px] overflow-y-auto">
-        <AnimatePresence>
-          {messages.length === 0 && status === "idle" && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center h-full text-zinc-500 py-12"
-            >
-              <p>Presiona Iniciar para comenzar el debate</p>
-            </motion.div>
-          )}
-          {messages.map((message, index) =>
-            message.role === "user" ? (
-              <p key={index} className="text-center text-sm text-zinc-300 mb-6">
-                <strong>Tú:</strong> {message.content}
-              </p>
-            ) : (
-              <ArgumentBubble key={index} message={message} index={index} />
-            )
-          )}
-        </AnimatePresence>
-        <div ref={(el) => el?.scrollIntoView({ behavior: "smooth" })} />
+      <div
+        className="caja-dialogo"
+        onClick={cajaClicable ? skip : undefined}
+        role="region"
+        aria-live="polite"
+        aria-label="Cuadro de diálogo"
+      >
+        {status === "idle" && !last ? (
+          <div className="caja-centro">
+            <p>* El Ángel y el Diablo esperan para debatir.</p>
+            <button className="caja-boton" onClick={debate.play}>
+              Iniciar
+            </button>
+          </div>
+        ) : (
+          <>
+            {nombreCaja && <div className={`caja-nombre arena-nombre-${speaker}`}>{nombreCaja}</div>}
+            <p className="caja-texto">
+              {shown}
+              {!done && <span className="caja-cursor" aria-hidden="true" />}
+            </p>
+            {done && !thinking && !waitingIntervention && !error && status === "running" && (
+              <span className="caja-flecha" aria-hidden="true">▼</span>
+            )}
+          </>
+        )}
+
+        {error && (
+          <p className="caja-error">
+            Error: {error}{" "}
+            <button className="caja-boton" onClick={debate.play}>
+              Reintentar
+            </button>
+          </p>
+        )}
+
+        {waitingIntervention && (
+          <div className="caja-intervencion">
+            <p className="caja-pregunta">* ¿Quieres decirles algo?</p>
+            <input
+              type="text"
+              value={interventionText}
+              onChange={(e) => setInterventionText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && decir()}
+              placeholder="Escribe tu mensaje..."
+              aria-label="Tu mensaje para el Ángel y el Diablo"
+              className="caja-campo"
+            />
+            <div className="caja-botones">
+              <button className="caja-boton" onClick={decir} disabled={!interventionText.trim()}>
+                Decir
+              </button>
+              <button className="caja-boton" onClick={debate.play}>
+                Seguir
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm"
-        >
-          <strong>Error:</strong> {error}
-        </motion.div>
-      )}
+      <div className="arena-barra">
+        {(status === "running" || status === "paused") && !waitingIntervention && !error && (
+          <button className="arena-enlace" onClick={status === "running" ? debate.pause : debate.play}>
+            {status === "running" ? "Pausar" : "Continuar"}
+          </button>
+        )}
+        <button className="arena-enlace" onClick={handleReset}>
+          Reiniciar
+        </button>
+      </div>
 
-      <DebateControls
-        status={status}
-        onPlayPause={handlePlayPause}
-        onReset={handleReset}
-        onIntervene={handleIntervene}
-      />
+      <details className="arena-historial">
+        <summary>Historial ({messages.length})</summary>
+        {messages.length === 0 ? (
+          <p className="arena-vacio">Todavía no se ha dicho nada.</p>
+        ) : (
+          <ol>
+            {messages.map((m, i) => (
+              <li key={i}>
+                <strong className={`arena-nombre-${m.role}`}>{NOMBRES[m.role]}:</strong> {m.content}
+              </li>
+            ))}
+          </ol>
+        )}
+      </details>
     </div>
   );
 }
