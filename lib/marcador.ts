@@ -44,12 +44,29 @@ export function leer(texto: string | null): Marcador {
       datos.angel >= 0 &&
       datos.diablo >= 0
     ) {
-      return datos;
+      return { angel: datos.angel, diablo: datos.diablo };
     }
   } catch {
     // JSON roto, devolver inicial
   }
   return MARCADOR_INICIAL;
+}
+
+/**
+ * Crea un lector que recuerda la última lectura: si recibe el mismo texto crudo
+ * que la vez anterior, devuelve el mismo objeto (===). Lo necesita
+ * useSyncExternalStore, que exige un getSnapshot estable.
+ */
+export function crearLectorCacheado(): (texto: string | null) => Marcador {
+  let ultimoTexto: string | null | undefined;
+  let ultimo: Marcador = MARCADOR_INICIAL;
+  return (texto) => {
+    if (ultimoTexto === undefined || texto !== ultimoTexto) {
+      ultimo = leer(texto);
+      ultimoTexto = texto;
+    }
+    return ultimo;
+  };
 }
 
 /**

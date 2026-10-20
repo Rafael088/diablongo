@@ -1,15 +1,15 @@
 /**
  * Script de comprobación del marcador.
  * Ejecutar con: node scripts/comprobar-marcador.ts
- * (Requiere tsx o similar: npm run ts -- scripts/comprobar-marcador.ts)
  */
 
 import {
   MARCADOR_INICIAL,
+  crearLectorCacheado,
   leer,
   sumar,
   tituloSegunRecord,
-} from "../lib/marcador";
+} from "../lib/marcador.ts";
 
 let passed = 0;
 let failed = 0;
@@ -157,6 +157,32 @@ test("tituloSegunRecord({2, 8}) debe ser 'Eres un caso perdido' (exacto 80%)", (
 // Test 24: tituloSegunRecord - justo bajo 60% ángel
 test("tituloSegunRecord({10, 7}) debe ser 'Ni frío ni caliente' (59% ángel)", () => {
   eq(tituloSegunRecord({ angel: 10, diablo: 7 }), "Ni frío ni caliente");
+});
+
+// Caché del lector (evita el bucle de useSyncExternalStore)
+test("crearLectorCacheado: mismo texto crudo devuelve el mismo objeto (===)", () => {
+  const lector = crearLectorCacheado();
+  const a = lector('{"angel": 3, "diablo": 5}');
+  const b = lector('{"angel": 3, "diablo": 5}');
+  if (a !== b) throw new Error("devolvió objetos distintos");
+  eq(a, { angel: 3, diablo: 5 });
+});
+
+test("crearLectorCacheado: null repetido devuelve el mismo objeto", () => {
+  const lector = crearLectorCacheado();
+  if (lector(null) !== lector(null)) throw new Error("devolvió objetos distintos");
+});
+
+test("crearLectorCacheado: texto distinto devuelve valor nuevo", () => {
+  const lector = crearLectorCacheado();
+  const a = lector('{"angel": 1, "diablo": 0}');
+  const b = lector('{"angel": 2, "diablo": 0}');
+  eq(b, { angel: 2, diablo: 0 });
+  if (a === b) throw new Error("no recalculó");
+});
+
+test("leer descarta campos extra", () => {
+  eq(Object.keys(leer('{"angel": 1, "diablo": 2, "x": 9}')).sort(), ["angel", "diablo"]);
 });
 
 console.log(`\n=== Resultado ===`);

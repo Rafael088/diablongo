@@ -59,9 +59,25 @@ function indicesDeVotos(param: string | null, mensajes: DebateMessage[]): number
   return [...usados];
 }
 
+/** ?marcador=3-5 deja ese marcador guardado antes de pintar (solo en la demo). */
+function guardarMarcadorDeDemo(param: string | null) {
+  if (typeof window === "undefined" || !param) return;
+  const m = /^(\d+)-(\d+)$/.exec(param);
+  if (!m) return;
+  try {
+    localStorage.setItem(
+      "marcador-angel-diablo",
+      JSON.stringify({ angel: Number(m[1]), diablo: Number(m[2]) }),
+    );
+  } catch {
+    // sin localStorage: la demo sigue sin marcador
+  }
+}
+
 function Demo() {
   const router = useRouter();
   const params = useSearchParams();
+  guardarMarcadorDeDemo(params.get("marcador"));
   const turno = Number(params.get("turno"));
   const g = params.get("ganador");
   const ganador = g === "pro" || g === "con" ? g : undefined;

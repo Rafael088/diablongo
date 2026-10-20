@@ -1,9 +1,12 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { leer, sumar, type Bando, type Marcador, MARCADOR_INICIAL } from "@/lib/marcador";
+import { crearLectorCacheado, sumar, MARCADOR_INICIAL } from "@/lib/marcador";
+import type { Bando, Marcador } from "@/lib/marcador";
 
 const STORAGE_KEY = "marcador-angel-diablo";
+
+const leerCacheado = crearLectorCacheado();
 
 /**
  * Suscribe a cambios en localStorage (simulado con storage events).
@@ -20,7 +23,7 @@ function subscribe(callback: () => void) {
 function getSnapshot(): Marcador {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return leer(stored);
+    return leerCacheado(stored);
   } catch {
     return MARCADOR_INICIAL;
   }
