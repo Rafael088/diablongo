@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DebateConfig, DebateMessage, DebateRole } from "@/types";
 import {
@@ -30,13 +30,14 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
   const pendingRef = useRef(false);
   const interventionRef = useRef<string | undefined>(undefined);
   const messagesRef = useRef<DebateMessage[]>([]);
-  const currentTurnRef = useRef<{ phase: string; round: number; speaker: DebateRole } | null>(null);
-  const statusRef = useRef(status);
+  const statusRef = useRef<"idle" | "running" | "paused" | "finished">("idle");
+  const runNextTurnRef = useRef<() => void>(() => {});
 
-  // Keep refs in sync
-  messagesRef.current = messages;
-  currentTurnRef.current = currentTurn;
-  statusRef.current = status;
+  // El estado y su ref cambian siempre juntos (los refs no se tocan al renderizar).
+  const updateStatus = useCallback((next: "idle" | "running" | "paused" | "finished") => {
+    statusRef.current = next;
+    setStatus(next);
+  }, []);
 
   const executeTurn = useCallback(
     async (speaker: DebateRole, phase: string, round: number, intervention?: string): Promise<boolean> => {
@@ -81,12 +82,12 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Error desconocido";
         setError(message);
-        setStatus("paused");
+        updateStatus("paused");
         pendingRef.current = false;
         return false;
       }
     },
-    [config]
+    [config, updateStatus]
   );
 
   const runNextTurn = useCallback(async () => {
@@ -114,7 +115,7 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
     const next = getTurn(done);
 
     if (!next) {
-      setStatus("finished");
+      updateStatus("finished");
       pendingRef.current = false;
       saveDebate({
         id: Date.now().toString(),
@@ -135,7 +136,7 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
 
     if (shouldPauseForIntervention(done)) {
       // Mitad del debate: pausa para que el usuario pueda intervenir.
-      setStatus("paused");
+      updateStatus("paused");
       pendingRef.current = false;
       return;
     }
@@ -145,18 +146,22 @@ export default function DebateArena({ config, onReset }: DebateArenaProps) {
     if (statusRef.current === "running") {
       setTimeout(() => {
         if (statusRef.current === "running") {
-          runNextTurn();
+          runNextTurnRef.current();
         }
       }, 1200);
     }
-  }, [config.topic, executeTurn]);
+  }, [config.topic, executeTurn, updateStatus]);
+
+  useEffect(() => {
+    runNextTurnRef.current = runNextTurn;
+  }, [runNextTurn]);
 
   const handlePlayPause = () => {
     if (status === "running") {
-      setStatus("paused");
+      updateStatus("paused");
     } else {
-      setStatus("running");
-      setTimeout(runNextTurn, 100);
+      updateStatus("running");
+      setTimeout(() => runNextTurnRef.current(), 100);
     }
   };
 

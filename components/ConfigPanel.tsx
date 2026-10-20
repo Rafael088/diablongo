@@ -1,53 +1,55 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { providers, getProviderById } from "@/lib/providers";
 import { DebateConfig, DebaterConfig } from "@/types";
-import { getConfig, saveConfig } from "@/lib/storage";
+import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
 import { Swords, Settings2 } from "lucide-react";
 
 interface ConfigPanelProps {
   onStart: (config: DebateConfig) => void;
 }
 
+const subscribeVacio = () => () => {};
+
+// Las preferencias guardadas viven en localStorage: solo existen en el navegador.
+// En el servidor se pinta con valores por defecto y, al hidratar, se vuelve a montar
+// el formulario con lo guardado (sin setState dentro de efectos).
 export default function ConfigPanel({ onStart }: ConfigPanelProps) {
-  const [topic, setTopic] = useState("");
+  const enNavegador = useSyncExternalStore(
+    subscribeVacio,
+    () => true,
+    () => false
+  );
+  return (
+    <ConfigForm
+      key={enNavegador ? "navegador" : "servidor"}
+      saved={enNavegador ? getConfig() : null}
+      onStart={onStart}
+    />
+  );
+}
 
-  const [proProvider, setProProvider] = useState("openrouter");
-  const [proModel, setProModel] = useState(providers[0].models[0]);
-  const [proApiKey, setProApiKey] = useState("");
+// Si el modelo elegido no pertenece al proveedor, se usa el primero del proveedor.
+function modeloValido(providerId: string, model: string): string {
+  const p = getProviderById(providerId);
+  return p && !p.models.includes(model) ? p.models[0] : model;
+}
 
-  const [conProvider, setConProvider] = useState("openrouter");
-  const [conModel, setConModel] = useState(providers[0].models[1]);
-  const [conApiKey, setConApiKey] = useState("");
+function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig | null }) {
+  const [topic, setTopic] = useState(saved?.topic ?? "");
 
-  useEffect(() => {
-    const saved = getConfig();
-    if (saved) {
-      setTopic(saved.topic);
-      setProProvider(saved.proProvider);
-      setProModel(saved.proModel);
-      setProApiKey(saved.proApiKey || "");
-      setConProvider(saved.conProvider);
-      setConModel(saved.conModel);
-      setConApiKey(saved.conApiKey || "");
-    }
-  }, []);
+  const [proProvider, setProProvider] = useState(saved?.proProvider ?? "openrouter");
+  const [proModelRaw, setProModel] = useState(saved?.proModel ?? providers[0].models[0]);
+  const [proApiKey, setProApiKey] = useState(saved?.proApiKey || "");
 
-  useEffect(() => {
-    const pro = getProviderById(proProvider);
-    if (pro && !pro.models.includes(proModel)) {
-      setProModel(pro.models[0]);
-    }
-  }, [proProvider, proModel]);
+  const [conProvider, setConProvider] = useState(saved?.conProvider ?? "openrouter");
+  const [conModelRaw, setConModel] = useState(saved?.conModel ?? providers[0].models[1]);
+  const [conApiKey, setConApiKey] = useState(saved?.conApiKey || "");
 
-  useEffect(() => {
-    const con = getProviderById(conProvider);
-    if (con && !con.models.includes(conModel)) {
-      setConModel(con.models[0]);
-    }
-  }, [conProvider, conModel]);
+  const proModel = modeloValido(proProvider, proModelRaw);
+  const conModel = modeloValido(conProvider, conModelRaw);
 
   const handleStart = () => {
     if (!topic.trim()) return;

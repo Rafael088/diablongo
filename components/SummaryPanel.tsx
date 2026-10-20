@@ -27,7 +27,7 @@ export default function SummaryPanel({ messages, topic, onNewDebate }: SummaryPa
         <h2 className="text-2xl md:text-3xl font-bold text-white">Debate finalizado</h2>
       </div>
 
-      <p className="text-zinc-400 text-center mb-8 italic">"{topic}"</p>
+      <p className="text-zinc-400 text-center mb-8 italic">&quot;{topic}&quot;</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <SummaryColumn

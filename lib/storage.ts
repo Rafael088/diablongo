@@ -1,4 +1,4 @@
-import { DebateState, DebaterConfig } from "@/types";
+import { DebateState } from "@/types";
 
 const DEBATES_KEY = "agent-debate-history";
 const CONFIG_KEY = "agent-debate-config";
