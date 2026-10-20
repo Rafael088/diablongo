@@ -35,3 +35,24 @@ export const proveedorGratis: ProviderConfig = {
   baseUrl: "https://openrouter.ai/api/v1",
   models: [],
 };
+
+export const MENSAJE_GRATIS_AGOTADO =
+  "Los modelos gratis están saturados ahora mismo. Prueba en un rato o usa tu propia key.";
+
+/** Aviso corto que ve la persona en la arena cuando el servidor cambió de modelo. */
+export const AVISO_RESPALDO_GRATIS = "Un modelo gratis falló; seguimos con otro.";
+
+/** Fallo de una llamada a un modelo: `status` es el HTTP, y falta si fue un error de red. */
+export class ErrorDeModelo extends Error {
+  constructor(mensaje: string, readonly status?: number) {
+    super(mensaje);
+    this.name = "ErrorDeModelo";
+  }
+}
+
+/** ¿Vale la pena probar con el siguiente modelo? 429, tiempo agotado, 5xx o caída de red. */
+export function esFalloDeModelo(error: unknown): boolean {
+  if (!(error instanceof ErrorDeModelo)) return false;
+  const s = error.status;
+  return s === undefined || s === 429 || s === 408 || s >= 500;
+}

@@ -68,4 +68,6 @@ export interface TurnRequest {
 
 export interface TurnResponse {
   content: string;
+  /** Aviso corto para la arena (p. ej. el servidor cambió de modelo gratis). */
+  aviso?: string;
 }
