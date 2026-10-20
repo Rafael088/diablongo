@@ -89,34 +89,34 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
       animate={{ opacity: 1, y: 0 }}
       className="w-full max-w-4xl mx-auto p-6"
     >
-      <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
+      <div className="config-caja">
         <div className="flex items-center gap-3 mb-8">
-          <div className="p-3 bg-indigo-500/20 rounded-xl">
-            <Swords className="w-8 h-8 text-indigo-400" />
+          <div className="p-3" style={{ border: "2px solid var(--color-diablo)" }}>
+            <Swords className="w-8 h-8" style={{ color: "var(--color-diablo)" }} />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white">Agent Debate</h1>
-            <p className="text-zinc-400">Pon a dos IAs a debatir cualquier tema</p>
+            <h1 className="config-titulo">Agent Debate</h1>
+            <p className="config-sub">Pon a dos IAs a debatir cualquier tema</p>
           </div>
         </div>
 
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-2">
+            <label className="config-etiqueta">
               Tema o propuesta a debatir
             </label>
             <textarea
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="¿Deberíamos migrar nuestra base de datos a PostgreSQL?"
-              className="w-full h-24 px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="config-campo h-24 resize-none"
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <DebaterForm
               title="Defensor (PRO)"
-              color="emerald"
+              color="pro"
               provider={proProvider}
               model={proModel}
               apiKey={proApiKey}
@@ -126,7 +126,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
             />
             <DebaterForm
               title="Opositor (CON)"
-              color="rose"
+              color="con"
               provider={conProvider}
               model={conModel}
               apiKey={conApiKey}
@@ -139,12 +139,12 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
           <button
             onClick={handleStart}
             disabled={!topic.trim()}
-            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-bold rounded-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-indigo-500/25"
+            className="config-iniciar"
           >
             Iniciar Debate
           </button>
 
-          <p className="text-xs text-zinc-500 text-center">
+          <p className="config-nota">
             Las API keys se guardan ofuscadas en tu navegador. Nunca se envían a ningún servidor propio.
           </p>
         </div>
@@ -155,7 +155,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
 
 interface DebaterFormProps {
   title: string;
-  color: "emerald" | "rose";
+  color: "pro" | "con";
   provider: string;
   model: string;
   apiKey: string;
@@ -176,34 +176,19 @@ function DebaterForm({
 }: DebaterFormProps) {
   const providerConfig = getProviderById(provider);
 
-  const styles = {
-    emerald: {
-      border: "border-emerald-500/30",
-      focus: "focus:ring-emerald-500",
-      icon: "text-emerald-400",
-      title: "text-emerald-400",
-    },
-    rose: {
-      border: "border-rose-500/30",
-      focus: "focus:ring-rose-500",
-      icon: "text-rose-400",
-      title: "text-rose-400",
-    },
-  }[color];
-
   return (
-    <div className={`bg-zinc-950/50 border ${styles.border} rounded-xl p-5 space-y-4`}>
+    <div className={`config-seccion config-seccion-${color}`}>
       <div className="flex items-center gap-2">
-        <Settings2 className={`w-5 h-5 ${styles.icon}`} />
-        <h3 className={`font-bold ${styles.title}`}>{title}</h3>
+        <Settings2 className="w-5 h-5" />
+        <h3 className="config-seccion-titulo">{title}</h3>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-zinc-400 mb-1">Proveedor</label>
+        <label className="config-etiqueta">Proveedor</label>
         <select
           value={provider}
           onChange={(e) => onProviderChange(e.target.value)}
-          className={`w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white text-sm focus:outline-none focus:ring-2 ${styles.focus}`}
+          className="config-campo"
         >
           {providers.map((p) => (
             <option key={p.id} value={p.id}>
@@ -214,11 +199,11 @@ function DebaterForm({
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-zinc-400 mb-1">Modelo</label>
+        <label className="config-etiqueta">Modelo</label>
         <select
           value={model}
           onChange={(e) => onModelChange(e.target.value)}
-          className={`w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white text-sm focus:outline-none focus:ring-2 ${styles.focus}`}
+          className="config-campo"
         >
           {providerConfig?.models.map((m) => (
             <option key={m} value={m}>
@@ -230,13 +215,13 @@ function DebaterForm({
 
       {providerConfig?.requiresApiKey && (
         <div>
-          <label className="block text-xs font-medium text-zinc-400 mb-1">API Key</label>
+          <label className="config-etiqueta">API Key</label>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => onApiKeyChange(e.target.value)}
             placeholder={`Tu key de ${providerConfig.name}`}
-            className={`w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white text-sm placeholder-zinc-600 focus:outline-none focus:ring-2 ${styles.focus}`}
+            className="config-campo"
           />
         </div>
       )}

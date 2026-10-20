@@ -2,13 +2,42 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { MARCA_TARJETA, nombreArchivoTarjeta, temaCorto, type Bando } from "@/lib/desenlace";
+import { TOKENS } from "@/lib/paleta";
 import { TAMANO_SPRITE, matrizDe, rectsDeMatriz } from "@/lib/sprites";
 
 export const TARJETA_ANCHO = 1080;
 export const TARJETA_ALTO = 1350;
-const FUENTE = "ui-monospace, 'DejaVu Sans Mono', Menlo, Consolas, monospace";
+const C = TOKENS;
+const TEXTO_FALLO = "ui-monospace, monospace";
 
-const ACENTO: Record<Bando, string> = { pro: "#ffcc3a", con: "#e2483d" };
+/** Familias de las fuentes de next/font (variables CSS del <html>) para pintar en el canvas. */
+interface Fuentes {
+  titulo: string;
+  dialogo: string;
+}
+function leerFuentes(): Fuentes {
+  const estilo = getComputedStyle(document.documentElement);
+  const familia = (v: string) => {
+    const valor = estilo.getPropertyValue(v).trim();
+    return valor ? `${valor}, ${TEXTO_FALLO}` : TEXTO_FALLO;
+  };
+  return { titulo: familia("--font-titulo"), dialogo: familia("--font-dialogo") };
+}
+
+/** Espera a que las dos fuentes estén cargadas con todos los glifos que va a usar la tarjeta. */
+async function cargarFuentes(f: Fuentes, textos: string[]): Promise<void> {
+  const muestra = textos.join(" ");
+  try {
+    await Promise.all([
+      document.fonts.load(`20px ${f.titulo}`, muestra),
+      document.fonts.load(`20px ${f.dialogo}`, muestra),
+    ]);
+  } catch {
+    // sin fuentes se pinta con el fallback monoespaciado
+  }
+}
+
+const ACENTO: Record<Bando, string> = { pro: C["--color-angel"], con: C["--color-diablo"] };
 const ETIQUETA: Record<Bando, string> = { pro: "Ganó el Ángel", con: "Ganó el Diablo" };
 
 /** Parte el texto en líneas que caben en `ancho` píxeles. */
@@ -28,16 +57,21 @@ function envolver(ctx: CanvasRenderingContext2D, texto: string, ancho: number): 
   return lineas;
 }
 
-function pintarTarjeta(canvas: HTMLCanvasElement, tema: string, desenlace: string, ganador: Bando) {
+function pintarTarjeta(
+  canvas: HTMLCanvasElement,
+  f: Fuentes,
+  tema: string, desenlace: string,
+  ganador: Bando,
+) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const acento = ACENTO[ganador];
   const centro = TARJETA_ANCHO / 2;
 
-  ctx.fillStyle = "#0d0a14";
+  ctx.fillStyle = C["--color-superficie"];
   ctx.fillRect(0, 0, TARJETA_ANCHO, TARJETA_ALTO);
   // Borde blanco grueso estilo Undertale.
-  ctx.strokeStyle = "#ffffff";
+  ctx.strokeStyle = C["--color-borde"];
   ctx.lineWidth = 20;
   ctx.strokeRect(50, 50, TARJETA_ANCHO - 100, TARJETA_ALTO - 100);
 
@@ -45,11 +79,11 @@ function pintarTarjeta(canvas: HTMLCanvasElement, tema: string, desenlace: strin
   ctx.textBaseline = "alphabetic";
 
   // Tema del usuario.
-  ctx.fillStyle = "#a1a1aa";
-  ctx.font = `34px ${FUENTE}`;
+  ctx.fillStyle = C["--color-texto-suave"];
+  ctx.font = `26px ${f.titulo}`;
   ctx.fillText("* TU DECISIÓN", centro, 150);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `bold 46px ${FUENTE}`;
+  ctx.fillStyle = C["--color-texto"];
+  ctx.font = `50px ${f.dialogo}`;
   const lineasTema = envolver(ctx, `«${temaCorto(tema, 90)}»`, 840).slice(0, 3);
   lineasTema.forEach((l, i) => ctx.fillText(l, centro, 215 + i * 58));
 
@@ -58,7 +92,7 @@ function pintarTarjeta(canvas: HTMLCanvasElement, tema: string, desenlace: strin
   const lado = TAMANO_SPRITE * escala;
   const x0 = centro - lado / 2;
   const y0 = 375;
-  ctx.fillStyle = "#1b1026";
+  ctx.fillStyle = C["--color-fondo"];
   ctx.fillRect(x0 - 20, y0 - 20, lado + 40, lado + 40);
   ctx.strokeStyle = acento;
   ctx.lineWidth = 8;
@@ -71,16 +105,16 @@ function pintarTarjeta(canvas: HTMLCanvasElement, tema: string, desenlace: strin
 
   // Quién ganó y el desenlace.
   ctx.fillStyle = acento;
-  ctx.font = `bold 44px ${FUENTE}`;
+  ctx.font = `38px ${f.titulo}`;
   ctx.fillText(ETIQUETA[ganador].toUpperCase(), centro, 1045);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `42px ${FUENTE}`;
+  ctx.fillStyle = C["--color-texto"];
+  ctx.font = `46px ${f.dialogo}`;
   const lineas = envolver(ctx, desenlace, 840).slice(0, 4);
-  lineas.forEach((l, i) => ctx.fillText(l, centro, 1110 + i * 52));
+  lineas.forEach((l, i) => ctx.fillText(l, centro, 1115 + i * 54));
 
   // Marca provisional.
-  ctx.fillStyle = "#71717a";
-  ctx.font = `28px ${FUENTE}`;
+  ctx.fillStyle = C["--color-texto-suave"];
+  ctx.font = `22px ${f.titulo}`;
   ctx.fillText(MARCA_TARJETA, centro, 1278);
 }
 
@@ -118,8 +152,17 @@ export default function TarjetaDesenlace({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    pintarTarjeta(canvas, tema, desenlace, ganador);
-    if (volcado && volcadoRef.current) volcadoRef.current.textContent = canvas.toDataURL("image/png");
+    let vigente = true;
+    const fuentes = leerFuentes();
+    // Hasta que las fuentes carguen no se pinta: así el PNG nunca sale con la tipografía de reserva.
+    void cargarFuentes(fuentes, [tema, desenlace, ETIQUETA[ganador], MARCA_TARJETA, "* TU DECISIÓN"]).then(() => {
+      if (!vigente) return;
+      pintarTarjeta(canvas, fuentes, tema, desenlace, ganador);
+      if (volcado && volcadoRef.current) volcadoRef.current.textContent = canvas.toDataURL("image/png");
+    });
+    return () => {
+      vigente = false;
+    };
   }, [tema, desenlace, ganador, volcado]);
 
   const aBlob = () =>

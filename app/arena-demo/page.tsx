@@ -119,7 +119,7 @@ function Demo() {
 
 export default function ArenaDemoPage() {
   return (
-    <main className="min-h-screen bg-zinc-950 py-6 px-3">
+    <main className="min-h-screen py-6 px-3">
       <Suspense>
         <Demo />
       </Suspense>

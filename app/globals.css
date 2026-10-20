@@ -1,90 +1,82 @@
 @import "tailwindcss";
 
+/* Paleta única (espejo de lib/paleta.ts; scripts/contraste.ts comprueba que coinciden). */
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
+  --color-fondo: #14121c;
+  --color-superficie: #0d0a14;
+  --color-borde: #ffffff;
+  --color-texto: #f5f2ea;
+  --color-texto-suave: #c7c2d8;
+  --color-angel: #ffcc3a;
+  --color-angel-brillo: #fff3a0;
+  --color-diablo: #f0685c;
+  --color-diablo-fuego: #ff8a2a;
+  --color-usuario: #8fd3ff;
+  --color-acento: #ffe066;
+  --color-error: #ffa8a0;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--color-fondo);
+  --color-foreground: var(--color-texto);
+  --font-sans: var(--font-dialogo);
+  --font-mono: var(--font-dialogo);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-family: var(--font-dialogo), ui-monospace, monospace;
+  font-size: 1.05rem;
+  line-height: 1.5;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+h1, h2, h3, h4 { font-family: var(--font-titulo), ui-monospace, monospace; font-weight: 400; line-height: 1.5; }
+.fuente-titulo { font-family: var(--font-titulo), ui-monospace, monospace; font-weight: 400; }
 
-::-webkit-scrollbar-track {
-  background: #18181b;
-}
+/* Pixel art: nada de suavizado ni radios. */
+canvas, svg, img { image-rendering: pixelated; }
 
-::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 4px;
-}
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--color-superficie); }
+::-webkit-scrollbar-thumb { background: var(--color-texto-suave); border: 2px solid var(--color-superficie); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-texto); }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
-}
-
-/* Range input styling */
 input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 6px;
-  background: #27272a;
-  border-radius: 3px;
-  outline: none;
+  -webkit-appearance: none; appearance: none; height: 8px;
+  background: var(--color-superficie); border: 2px solid var(--color-borde); border-radius: 0; outline: none;
 }
-
 input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  background: #6366f1;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: background 0.2s;
+  -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+  background: var(--color-acento); border-radius: 0; cursor: pointer;
 }
 
-input[type="range"]::-webkit-slider-thumb:hover {
-  background: #818cf8;
-}
+*:focus-visible { outline: 3px solid var(--color-acento); outline-offset: 2px; }
 
 /* Arena de Ángel contra Diablo. Colores en variables para la tarea de paleta. */
+/* Variables de componentes: apuntan a los tokens. */
 :root {
-  --arena-fondo: #14121c;
-  --arena-texto: #fafafa;
-  --arena-tenue: #a1a1aa;
-  --caja-fondo: #000000;
-  --caja-borde: #ffffff;
-  --caja-texto: #ffffff;
-  --nombre-pro: #fde68a;
-  --nombre-con: #fb7185;
-  --nombre-user: #7dd3fc;
-  --barra-fondo: #000000;
-  --barra-borde: #ffffff;
-  --barra-pro: #fde68a;
-  --barra-con: #fb7185;
-  --barra-marcador: #ffffff;
-  --barra-marcador-borde: #14121c;
-  --arena-error: #fca5a5;
-  --arena-fuente: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  --arena-fondo: var(--color-fondo);
+  --arena-texto: var(--color-texto);
+  --arena-tenue: var(--color-texto-suave);
+  --caja-fondo: var(--color-superficie);
+  --caja-borde: var(--color-borde);
+  --caja-texto: var(--color-texto);
+  --nombre-pro: var(--color-angel);
+  --nombre-con: var(--color-diablo);
+  --nombre-user: var(--color-usuario);
+  --barra-fondo: var(--color-superficie);
+  --barra-borde: var(--color-borde);
+  --barra-pro: var(--color-angel);
+  --barra-con: var(--color-diablo);
+  --barra-marcador: var(--color-borde);
+  --barra-marcador-borde: var(--color-fondo);
+  --arena-error: var(--color-error);
+  --arena-fuente: var(--font-dialogo), ui-monospace, monospace;
 }
 
 .arena { font-family: var(--arena-fuente); color: var(--arena-texto); }
-.arena-titulo { font-size: 1.1rem; font-weight: 700; }
+.arena-titulo { font-family: var(--font-titulo), ui-monospace, monospace; font-size: 0.85rem; line-height: 1.6; }
 .arena-sub { font-size: 0.8rem; color: var(--arena-tenue); }
 .arena-escenario {
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -96,12 +88,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .personaje-lienzo { position: relative; width: 100%; }
 .personaje-halo {
   position: absolute; inset: -18%; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle, rgba(253,224,71,0.85) 0%, rgba(253,224,71,0.35) 45%, transparent 70%);
+  background: radial-gradient(circle, rgba(255,243,160,0.85) 0%, rgba(255,243,160,0.35) 45%, transparent 70%);
   filter: blur(4px);
 }
 .personaje-fuego { position: absolute; left: -6%; right: -6%; bottom: -6%; width: 112%; height: auto; pointer-events: none; }
 .arena-apagado { opacity: 0.55; }
-.arena-nombre { font-size: 0.8rem; font-weight: 700; }
+.arena-nombre { font-family: var(--font-titulo), ui-monospace, monospace; font-size: 0.6rem; line-height: 1.5; text-align: center; }
 .arena-nombre-pro { color: var(--nombre-pro); }
 .arena-nombre-con { color: var(--nombre-con); }
 .arena-nombre-user { color: var(--nombre-user); }
@@ -110,9 +102,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
   position: relative; min-height: 8.5rem; padding: 14px 16px;
   background: var(--caja-fondo); color: var(--caja-texto);
   border: 4px solid var(--caja-borde); border-radius: 0;
-  font-size: 1rem; line-height: 1.5;
+  font-family: var(--font-dialogo), ui-monospace, monospace; font-size: 1.15rem; line-height: 1.5;
 }
-.caja-nombre { font-weight: 700; margin-bottom: 4px; }
+.caja-nombre { font-family: var(--font-titulo), ui-monospace, monospace; font-size: 0.7rem; margin-bottom: 8px; }
 .caja-texto { white-space: pre-wrap; }
 .caja-cursor { display: inline-block; width: 0.6em; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: var(--caja-texto); }
 .caja-flecha { position: absolute; right: 12px; bottom: 6px; font-size: 0.8rem; }
@@ -124,11 +116,11 @@ input[type="range"]::-webkit-slider-thumb:hover {
   width: 100%; padding: 8px 10px; background: var(--caja-fondo); color: var(--caja-texto);
   border: 2px solid var(--caja-borde); border-radius: 0; font: inherit; font-size: 0.95rem;
 }
-.caja-campo:focus { outline: 2px solid var(--nombre-pro); outline-offset: 2px; }
+
 .caja-botones { display: flex; gap: 12px; }
 .caja-boton {
-  padding: 6px 16px; background: var(--caja-fondo); color: var(--caja-texto);
-  border: 2px solid var(--caja-borde); font: inherit; cursor: pointer;
+  padding: 8px 14px; background: var(--caja-fondo); color: var(--caja-texto);
+  border: 2px solid var(--caja-borde); font-family: var(--font-titulo), ui-monospace, monospace; font-size: 0.65rem; line-height: 1.5; cursor: pointer;
 }
 .caja-boton:hover:not(:disabled) { background: var(--caja-borde); color: var(--caja-fondo); }
 .caja-boton:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -169,16 +161,17 @@ input[type="range"]::-webkit-slider-thumb:hover {
 /* Pantalla final: elección y tarjeta de desenlace */
 .caja-eleccion { display: flex; flex-direction: column; gap: 10px; }
 .caja-boton-sugerido { border-color: var(--nombre-user); box-shadow: 0 0 0 3px var(--nombre-user); }
+.caja-boton:focus-visible, .caja-campo:focus-visible { outline: 3px solid var(--color-acento); outline-offset: 2px; }
 .tarjeta { margin: 18px auto 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .tarjeta-canvas { width: min(100%, 360px); height: auto; aspect-ratio: 1080 / 1350; image-rendering: pixelated; }
 .tarjeta-botones { flex-wrap: wrap; justify-content: center; }
 
 /* Marcador de Ángel vs Diablo */
 :root {
-  --marcador-fondo: #000000;
-  --marcador-borde: #ffffff;
-  --marcador-texto: #ffffff;
-  --marcador-titulo: #a1a1aa;
+  --marcador-fondo: var(--color-superficie);
+  --marcador-borde: var(--color-borde);
+  --marcador-texto: var(--color-texto);
+  --marcador-titulo: var(--color-texto-suave);
 }
 
 .marcador-contenedor { display: flex; justify-content: center; margin-top: 18px; }
@@ -188,14 +181,43 @@ input[type="range"]::-webkit-slider-thumb:hover {
   font-family: var(--arena-fuente); min-width: 180px;
 }
 .marcador-puntos {
-  font-weight: 700; font-size: 1.2rem; color: var(--marcador-texto); white-space: nowrap;
+  font-family: var(--font-titulo), ui-monospace, monospace; font-size: 0.8rem; color: var(--marcador-texto); white-space: nowrap;
 }
 .marcador-titulo {
   font-size: 0.85rem; color: var(--marcador-titulo); text-align: center; max-width: 160px;
 }
 .marcador-boton {
   margin-top: 4px; padding: 4px 10px; background: var(--marcador-fondo); color: var(--marcador-texto);
-  border: 2px solid var(--marcador-borde); font-size: 0.75rem; cursor: pointer; font-family: var(--arena-fuente);
+  border: 2px solid var(--marcador-borde); font-size: 0.6rem; cursor: pointer; font-family: var(--font-titulo), ui-monospace, monospace;
 }
 .marcador-boton:hover { background: var(--marcador-borde); color: var(--marcador-fondo); }
 .marcador-boton:active { transform: scale(0.98); }
+
+/* Pantalla de configuración (estilo pixel; la lógica no cambia). */
+.config-caja { background: var(--color-superficie); border: 4px solid var(--color-borde); border-radius: 0; padding: 24px; }
+.config-titulo { font-size: 1.1rem; line-height: 1.6; color: var(--color-texto); }
+.config-sub { color: var(--color-texto-suave); }
+.config-etiqueta { display: block; margin-bottom: 6px; color: var(--color-texto); }
+.config-campo {
+  width: 100%; padding: 8px 10px; background: var(--color-fondo); color: var(--color-texto);
+  border: 2px solid var(--color-borde); border-radius: 0; font: inherit;
+}
+.config-campo::placeholder { color: var(--color-texto-suave); }
+.config-seccion { background: var(--color-fondo); border: 2px solid var(--color-borde); border-radius: 0; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.config-seccion-pro { border-color: var(--color-angel); }
+.config-seccion-con { border-color: var(--color-diablo); }
+.config-seccion-titulo { font-size: 0.7rem; }
+.config-seccion-pro .config-seccion-titulo { color: var(--color-angel); }
+.config-seccion-con .config-seccion-titulo { color: var(--color-diablo); }
+.config-iniciar {
+  width: 100%; padding: 14px; background: var(--color-angel); color: var(--color-superficie);
+  border: 4px solid var(--color-borde); border-radius: 0; cursor: pointer;
+  font-family: var(--font-titulo), ui-monospace, monospace; font-size: 0.8rem;
+}
+.config-iniciar:hover:not(:disabled) { background: var(--color-angel-brillo); }
+.config-iniciar:disabled { background: var(--color-superficie); color: var(--color-texto-suave); cursor: not-allowed; }
+.config-nota { text-align: center; color: var(--color-texto-suave); font-size: 0.9rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}
