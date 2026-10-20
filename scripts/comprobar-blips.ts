@@ -1,3 +1,4 @@
+// Migrado a tests/blips.test.ts; este script se mantiene por compatibilidad
 /**
  * Script de prueba para la lógica pura de blips (versión compilada).
  * Ejecutar con: node scripts/comprobar-blips.ts o node scripts/comprobar-blips.js

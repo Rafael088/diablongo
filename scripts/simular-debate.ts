@@ -1,3 +1,4 @@
+// Migrado a tests/simular-debate.test.ts; este script se mantiene por compatibilidad
 // Simula un debate completo con el motor, sin llamar a ningún modelo.
 // Uso: node scripts/simular-debate.ts   (Node 22.18+ ejecuta TypeScript directo)
 //  o:  npx tsx scripts/simular-debate.ts

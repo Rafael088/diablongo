@@ -1,3 +1,4 @@
+// Migrado a tests/tentacion.test.ts; este script se mantiene por compatibilidad
 // Comprueba lib/tentacion.ts. Uso: node scripts/comprobar-tentacion.ts
 import {
   PASO,

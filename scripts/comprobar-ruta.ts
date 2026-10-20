@@ -1,3 +1,4 @@
+// Migrado a tests/validarTurno.test.ts; este script se mantiene por compatibilidad
 // Comprueba la validación de /api/debate sin llamar a ningún modelo.
 // Uso: node scripts/comprobar-ruta.ts
 import { validarTurno } from "../lib/validarTurno.ts";

@@ -1,3 +1,4 @@
+// Migrado a tests/sprites.test.ts; este script se mantiene por compatibilidad
 // Comprueba que cada sprite sea de 32×32 y use solo caracteres de la paleta.
 // Uso: node scripts/comprobar-sprites.ts   (sale con código 1 si algo falla)
 import {

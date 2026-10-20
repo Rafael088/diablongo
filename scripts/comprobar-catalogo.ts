@@ -1,3 +1,4 @@
+// Migrado a tests/catalogo.test.ts; este script se mantiene por compatibilidad
 // Comprueba el catálogo de lib/providers.ts.
 // Uso: node scripts/comprobar-catalogo.ts [--en-linea]
 import { providers } from "../lib/providers.ts";

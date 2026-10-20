@@ -1,3 +1,4 @@
+// Migrado a tests/marcador.test.ts; este script se mantiene por compatibilidad
 /**
  * Script de comprobación del marcador.
  * Ejecutar con: node scripts/comprobar-marcador.ts

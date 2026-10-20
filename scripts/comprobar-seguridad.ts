@@ -1,3 +1,4 @@
+// Migrado a tests/seguridad.test.ts; este script se mantiene por compatibilidad
 // Pruebas del revisor de seguridad y del modo simulado de correr.ts.
 // Uso: node scripts/comprobar-seguridad.ts   (exit 1 si algo falla)
 import { spawnSync } from "node:child_process";
