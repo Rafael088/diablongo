@@ -172,3 +172,30 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .tarjeta { margin: 18px auto 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .tarjeta-canvas { width: min(100%, 360px); height: auto; aspect-ratio: 1080 / 1350; image-rendering: pixelated; }
 .tarjeta-botones { flex-wrap: wrap; justify-content: center; }
+
+/* Marcador de Ángel vs Diablo */
+:root {
+  --marcador-fondo: #000000;
+  --marcador-borde: #ffffff;
+  --marcador-texto: #ffffff;
+  --marcador-titulo: #a1a1aa;
+}
+
+.marcador-contenedor { display: flex; justify-content: center; margin-top: 18px; }
+.marcador-box {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 20px;
+  background: var(--marcador-fondo); border: 4px solid var(--marcador-borde); border-radius: 0;
+  font-family: var(--arena-fuente); min-width: 180px;
+}
+.marcador-puntos {
+  font-weight: 700; font-size: 1.2rem; color: var(--marcador-texto); white-space: nowrap;
+}
+.marcador-titulo {
+  font-size: 0.85rem; color: var(--marcador-titulo); text-align: center; max-width: 160px;
+}
+.marcador-boton {
+  margin-top: 4px; padding: 4px 10px; background: var(--marcador-fondo); color: var(--marcador-texto);
+  border: 2px solid var(--marcador-borde); font-size: 0.75rem; cursor: pointer; font-family: var(--arena-fuente);
+}
+.marcador-boton:hover { background: var(--marcador-borde); color: var(--marcador-fondo); }
+.marcador-boton:active { transform: scale(0.98); }

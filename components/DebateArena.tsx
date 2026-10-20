@@ -9,6 +9,8 @@ import { TOTAL_TURNS, canIntervene, countTurnsPlayed, getTurn } from "@/lib/deba
 import { useDebate, type DebateStatus, type GenerateTurn } from "@/hooks/useDebate";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { useSoundEnabled, setSoundEnabled } from "@/hooks/useSoundEnabled";
+import { useMarcador, sumarMarcador, borrarMarcador } from "@/hooks/useMarcador";
+import { tituloSegunRecord } from "@/lib/marcador";
 import { blipAlAvanzar, getBaseFrequency, playBlip } from "@/lib/blips";
 import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
 import PersonajeAnimado from "./PersonajeAnimado";
@@ -72,6 +74,7 @@ export default function DebateArena({
   const { messages, status, thinking, error, textRead } = debate;
   const [interventionText, setInterventionText] = useState("");
   const soundEnabled = useSoundEnabled();
+  const marcador = useMarcador();
   const prevBlipRef = useRef({ text: "", count: 0 });
   const quieto = useReducedMotion() ?? false;
   // Pantalla final: a quién hizo caso el usuario y el desenlace de la tarjeta.
@@ -218,6 +221,10 @@ export default function DebateArena({
   const elegir = async (quien: Bando) => {
     if (eleccion) return;
     setEleccion(quien);
+    // Suma al marcador solo si no es demo (persist !== false).
+    if (persist !== false) {
+      sumarMarcador(quien);
+    }
     // LLAMADA 9 (o plantilla local si falla o tarda); la caja muestra "..." mientras tanto.
     setDesenlace(await debate.pedirDesenlace(quien));
   };
@@ -385,13 +392,34 @@ export default function DebateArena({
       </div>
 
       {enFinal && eleccion && desenlace && (
-        <TarjetaDesenlace
-          tema={config.topic}
-          desenlace={desenlace}
-          ganador={eleccion}
-          onJugarOtra={handleReset}
-          volcado={volcadoTarjeta}
-        />
+        <>
+          <TarjetaDesenlace
+            tema={config.topic}
+            desenlace={desenlace}
+            ganador={eleccion}
+            onJugarOtra={handleReset}
+            volcado={volcadoTarjeta}
+          />
+          <div className="marcador-contenedor">
+            <div className="marcador-box">
+              <div className="marcador-puntos">
+                😇 {marcador.angel} – {marcador.diablo} 😈
+              </div>
+              <div className="marcador-titulo">{tituloSegunRecord(marcador)}</div>
+              <button
+                className="marcador-boton"
+                onClick={() => {
+                  if (typeof window !== "undefined" && window.confirm("¿Borrar todo el marcador?")) {
+                    borrarMarcador();
+                  }
+                }}
+                aria-label="Borrar marcador"
+              >
+                Borrar marcador
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       <div className="arena-barra">
