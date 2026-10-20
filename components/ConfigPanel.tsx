@@ -2,8 +2,8 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
-import { providers, getProviderById } from "@/lib/providers";
-import { DebateConfig, DebaterConfig } from "@/types";
+import { proveedoresDisponibles, getProviderById } from "@/lib/providers";
+import { DebateConfig, DebaterConfig, ProviderConfig } from "@/types";
 import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
 import { Swords, Settings2 } from "lucide-react";
 import { MAX_TEMA } from "@/lib/topes";
@@ -38,15 +38,22 @@ function modeloValido(providerId: string, model: string): string {
   return p && !p.models.includes(model) ? p.models[0] : model;
 }
 
+// Un proveedor guardado que ya no está disponible (p. ej. ollama en producción) cae al primero.
+function proveedorValido(id: string | undefined, disponibles: ProviderConfig[]): string {
+  return disponibles.find((p) => p.id === id)?.id ?? disponibles[0].id;
+}
+
 function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig | null }) {
+  const disponibles = proveedoresDisponibles();
+  const porDefecto = disponibles[0];
   const [topic, setTopic] = useState((saved?.topic ?? "").slice(0, MAX_TEMA));
 
-  const [proProvider, setProProvider] = useState(saved?.proProvider ?? "openrouter");
-  const [proModelRaw, setProModel] = useState(saved?.proModel ?? providers[0].models[0]);
+  const [proProvider, setProProvider] = useState(proveedorValido(saved?.proProvider, disponibles));
+  const [proModelRaw, setProModel] = useState(saved?.proModel ?? porDefecto.models[0]);
   const [proApiKey, setProApiKey] = useState(saved?.proApiKey || "");
 
-  const [conProvider, setConProvider] = useState(saved?.conProvider ?? "openrouter");
-  const [conModelRaw, setConModel] = useState(saved?.conModel ?? providers[0].models[1]);
+  const [conProvider, setConProvider] = useState(proveedorValido(saved?.conProvider, disponibles));
+  const [conModelRaw, setConModel] = useState(saved?.conModel ?? porDefecto.models[1]);
   const [conApiKey, setConApiKey] = useState(saved?.conApiKey || "");
 
   const proModel = modeloValido(proProvider, proModelRaw);
@@ -195,7 +202,7 @@ function DebaterForm({
           onChange={(e) => onProviderChange(e.target.value)}
           className="config-campo"
         >
-          {providers.map((p) => (
+          {proveedoresDisponibles().map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>

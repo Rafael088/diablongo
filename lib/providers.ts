@@ -62,6 +62,20 @@ export const providers: ProviderConfig[] = [
   },
 ];
 
-export function getProviderById(id: string): ProviderConfig | undefined {
-  return providers.find((p) => p.id === id);
+// Proveedores que solo existen en desarrollo: apuntan a la máquina del usuario (localhost),
+// así que en producción serían inútiles y harían que el servidor pidiera una URL interna.
+const SOLO_DESARROLLO = ["ollama"];
+
+// Sin argumento usa process.env.NODE_ENV (Next lo sustituye también en el build del cliente).
+// Pasando el entorno (incluso undefined) se puede probar sin tocar el entorno real.
+// Solo "development" lo deja pasar: "production", "test" o sin definir lo excluyen.
+export function proveedoresDisponibles(...args: [entorno?: string]): ProviderConfig[] {
+  const entorno = args.length > 0 ? args[0] : process.env.NODE_ENV;
+  return entorno === "development"
+    ? providers
+    : providers.filter((p) => !SOLO_DESARROLLO.includes(p.id));
+}
+
+export function getProviderById(id: string, ...args: [entorno?: string]): ProviderConfig | undefined {
+  return proveedoresDisponibles(...args).find((p) => p.id === id);
 }

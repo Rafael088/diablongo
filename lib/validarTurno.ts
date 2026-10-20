@@ -38,8 +38,9 @@ function esObjeto(x: unknown): x is Record<string, unknown> {
 /**
  * Valida el cuerpo de /api/debate antes de llamar a ningún proveedor.
  * Los mensajes de error nunca repiten el valor recibido.
+ * `entorno` (opcional) sustituye a process.env.NODE_ENV; sirve para probar.
  */
-export function validarTurno(body: unknown): ResultadoValidacion {
+export function validarTurno(body: unknown, ...args: [entorno?: string]): ResultadoValidacion {
   if (!esObjeto(body)) return fallo("El cuerpo de la petición no es válido.");
 
   const { topic, role, phase, provider: providerId, model, apiKey, history, intervention } = body;
@@ -57,7 +58,7 @@ export function validarTurno(body: unknown): ResultadoValidacion {
     return fallo("La fase indicada no es válida.");
   }
   if (typeof providerId !== "string") return fallo("Falta el proveedor.");
-  const provider = getProviderById(providerId);
+  const provider = getProviderById(providerId, ...args);
   if (!provider) return fallo("El proveedor indicado no está permitido.");
   if (typeof model !== "string" || !provider.models.includes(model)) {
     return fallo("El modelo indicado no está permitido para ese proveedor.");

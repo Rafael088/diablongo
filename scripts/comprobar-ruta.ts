@@ -1,7 +1,7 @@
 // Comprueba la validación de /api/debate sin llamar a ningún modelo.
 // Uso: node scripts/comprobar-ruta.ts
 import { validarTurno } from "../lib/validarTurno.ts";
-import { providers } from "../lib/providers.ts";
+import { providers, proveedoresDisponibles, getProviderById } from "../lib/providers.ts";
 import {
   MAX_INTERVENCION,
   MAX_INTERVENCIONES_USUARIO,
@@ -84,6 +84,26 @@ afirmar(ok.ok, "caso válido: debía aceptarse");
 for (const f of ["opening", "rebuttal", "counter", "closing", "intervention", "desenlace"]) {
   afirmar(validarTurno({ ...base, phase: f }).ok, `fase ${f} debía aceptarse`);
 }
+
+// Ollama solo con NODE_ENV === "development"
+const ollama = providers.find((p) => p.id === "ollama")!;
+const cuerpoOllama = { ...base, provider: "ollama", model: ollama.models[0], apiKey: "" };
+const desconocido = validarTurno({ ...base, provider: "proveedor-raro" }, "production");
+for (const entorno of ["production", "test", undefined]) {
+  const e = String(entorno);
+  const r = validarTurno(cuerpoOllama, entorno);
+  afirmar(!r.ok, `ollama con entorno ${e}: debía rechazarse`);
+  if (!r.ok && !desconocido.ok) {
+    afirmar(r.status === 400, `ollama con entorno ${e}: status ${r.status}`);
+    afirmar(r.error === desconocido.error, `ollama con entorno ${e}: el mensaje debe ser el de proveedor desconocido`);
+  }
+  afirmar(!proveedoresDisponibles(entorno).some((p) => p.id === "ollama"), `ollama no debía aparecer en la lista (${e})`);
+  afirmar(getProviderById("ollama", entorno) === undefined, `getProviderById(ollama) debía ser undefined (${e})`);
+  afirmar(proveedoresDisponibles(entorno)[0].id !== "ollama", `el primero de la lista no puede ser ollama (${e})`);
+}
+afirmar(validarTurno(cuerpoOllama, "development").ok, "ollama en development debía aceptarse");
+afirmar(proveedoresDisponibles("development").some((p) => p.id === "ollama"), "ollama debía aparecer en development");
+afirmar(validarTurno(base, "production").ok, "gemini en production debía aceptarse");
 
 if (errores.length) {
   console.error("FALLOS:\n- " + errores.join("\n- "));
