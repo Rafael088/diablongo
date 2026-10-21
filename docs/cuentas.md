@@ -139,7 +139,7 @@ pago de la simulación no existe).
 Cuarto modo de la configuración; solo aparece si las cuentas están configuradas. Ángel y Diablo juegan con
 modelos de pago y la key del servidor (`OPENROUTER_API_KEY`), como el modo gratis pero sin límite diario.
 Modelos y costo están en `lib/creditosDebate.ts` (**provisionales** hasta cotejo-j9s6uq): 1 crédito por
-debate; Claude Haiku 5.5 / Gemini 3.8 Flash para el Ángel y Gemini 3.8 Flash / DeepSeek V4 Pro para el
+debate; Claude Haiku 5.5 / Gemini 3.1 Flash Lite para el Ángel y Gemini 3.1 Flash Lite / DeepSeek V4 Pro para el
 Diablo (el segundo de cada lista es el respaldo). Un debate de 9 llamadas cuesta menos de 2 centavos de dólar.
 
 - **Cobro:** `POST /api/debate/start` exige sesión (401), los dos personajes en créditos (400) y saldo (402).

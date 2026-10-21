@@ -12,7 +12,19 @@ import {
   ErrorDeModelo,
   esFalloDeModelo,
 } from "@/lib/gratis";
-import { MAX_CUERPO_BYTES, MAX_TOKENS_RESPUESTA } from "@/lib/topes";
+import { MAX_CUERPO_BYTES } from "@/lib/topes";
+import {
+  TOPE_CON_RAZONAMIENTO,
+  cuerpoChat,
+  esOpenRouter,
+  esRazonamientoObligatorio,
+  leerRespuesta,
+  textoUtil,
+  type RespuestaChat,
+} from "@/lib/openrouter";
+
+const MENSAJE_RESPUESTA_CORTADA =
+  "El modelo no terminó la frase (se quedó sin espacio). Vuelve a intentarlo o prueba otro modelo.";
 import { MENSAJE_SIN_SECRETO, comprobarTurno, obtenerSecreto, verificarToken } from "@/lib/tokenDebate";
 import { obtenerRegistroTurnos, type RegistroTurnos } from "@/lib/registroTurnos";
 import { TOTAL_TURNS } from "@/lib/debateEngine";
@@ -244,40 +256,41 @@ async function callOpenAICompatible(
   }
 
   // OpenRouter requires an additional header
-  if (baseUrl.includes("openrouter.ai")) {
+  const openRouter = esOpenRouter(baseUrl);
+  if (openRouter) {
     headers["HTTP-Referer"] = "https://agent-debate.vercel.app";
     headers["X-Title"] = "Agent Debate";
   }
+  const ocultar = (t: string) => (apiKey ? t.split(apiKey).join("[oculta]") : t);
 
-  let response: Response;
-  try {
-    response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: MAX_TOKENS_RESPUESTA,
-      }),
-    });
-  } catch (error) {
-    throw new ErrorDeModelo(error instanceof Error ? error.message : "error de red");
+  // Primero con el razonamiento apagado (lib/openrouter.ts); si el modelo no lo permite, una vez
+  // más sin el parámetro y con más margen.
+  for (const razonamientoObligatorio of [false, true]) {
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(
+          cuerpoChat({ modelo: model, system: systemPrompt, user: userPrompt, openRouter, razonamientoObligatorio })
+        ),
+      });
+    } catch (error) {
+      throw new ErrorDeModelo(error instanceof Error ? error.message : "error de red");
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (openRouter && !razonamientoObligatorio && esRazonamientoObligatorio(response.status, errorText)) continue;
+      throw new ErrorDeModelo(`API error (${response.status}): ${ocultar(errorText)}`, response.status);
+    }
+
+    // Vacía o cortada sin una frase completa: cuenta como fallo del modelo (pasa al respaldo).
+    const texto = leerRespuesta((await response.json()) as RespuestaChat);
+    if (!texto) throw new ErrorDeModelo(MENSAJE_RESPUESTA_CORTADA);
+    return texto;
   }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new ErrorDeModelo(
-      `API error (${response.status}): ${apiKey ? errorText.split(apiKey).join("[oculta]") : errorText}`,
-      response.status
-    );
-  }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content?.trim() || "No response";
+  throw new ErrorDeModelo(MENSAJE_RESPUESTA_CORTADA);
 }
 
 async function callGemini(
@@ -290,9 +303,14 @@ async function callGemini(
   const geminiModel = genAI.getGenerativeModel({
     model,
     systemInstruction: systemPrompt,
-    generationConfig: { maxOutputTokens: MAX_TOKENS_RESPUESTA },
+    // Los Gemini 3.x razonan y el razonamiento cuenta en el tope: margen amplio (la longitud la
+    // manda el prompt) y, si aun así corta, se queda con las frases completas.
+    generationConfig: { maxOutputTokens: TOPE_CON_RAZONAMIENTO },
   });
 
   const result = await geminiModel.generateContent(userPrompt);
-  return result.response.text().trim() || "No response";
+  const fin = result.response.candidates?.[0]?.finishReason;
+  const texto = textoUtil(result.response.text(), fin === "MAX_TOKENS" ? "length" : fin);
+  if (!texto) throw new ErrorDeModelo(MENSAJE_RESPUESTA_CORTADA);
+  return texto;
 }

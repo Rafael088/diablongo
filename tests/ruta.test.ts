@@ -17,6 +17,7 @@ import {
   MAX_TOKENS_RESPUESTA,
 } from "@/lib/topes";
 import { SECRETO_PRUEBA, conToken } from "./ayudaToken";
+import { TOPE_CON_RAZONAMIENTO } from "@/lib/openrouter";
 
 const gemini = vi.hoisted(() => ({
   generateContent: vi.fn(),
@@ -199,7 +200,7 @@ describe("POST /api/debate: caso válido", () => {
     expect((init.headers as Record<string, string>)["Authorization"]).toBeUndefined();
   });
 
-  it("Gemini: 200, usa el SDK (no fetch) con maxOutputTokens fijo", async () => {
+  it("Gemini: 200, usa el SDK (no fetch) con margen para el razonamiento", async () => {
     const model = modelosDe("gemini")[0];
     const { status, json } = await llamar({ ...base, provider: "gemini", model });
     expect(status).toBe(200);
@@ -207,7 +208,7 @@ describe("POST /api/debate: caso válido", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(gemini.constructor).toHaveBeenCalledWith(base.apiKey);
     expect(gemini.getGenerativeModel).toHaveBeenCalledWith(
-      expect.objectContaining({ model, generationConfig: { maxOutputTokens: MAX_TOKENS_RESPUESTA } })
+      expect.objectContaining({ model, generationConfig: { maxOutputTokens: TOPE_CON_RAZONAMIENTO } })
     );
   });
 });
