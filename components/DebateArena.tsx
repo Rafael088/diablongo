@@ -16,6 +16,7 @@ import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
 import PersonajeAnimado from "./PersonajeAnimado";
 import { MINIMO, TOPE, quienGana, textoGanando, valorDeVotos, type Ganando } from "@/lib/tentacion";
 import TarjetaDesenlace from "./TarjetaDesenlace";
+import { teclaAvanza } from "@/lib/avance";
 import { MAX_INTERVENCION } from "@/lib/topes";
 
 interface DebateArenaProps {
@@ -75,7 +76,7 @@ export default function DebateArena({
   volcadoTarjeta = false,
 }: DebateArenaProps) {
   const debate = useDebate(config, { generate, initialMessages, initialStatus, persist, turnstile });
-  const { messages, status, thinking, error, aviso, textRead } = debate;
+  const { messages, status, thinking, error, aviso, textRead, esperandoSiguiente, siguiente } = debate;
   const [interventionText, setInterventionText] = useState("");
   const soundEnabled = useSoundEnabled();
   const marcador = useMarcador();
@@ -117,18 +118,19 @@ export default function DebateArena({
     }
   }, [count, soundEnabled, thinking, instant, last, lineText]);
 
-  // Clic o tecla para completar la frase al instante.
+  // Enter o espacio: completa la frase si se está escribiendo; si ya se leyó, pasa a la siguiente.
+  // No actúan sobre campos, botones ni enlaces (cada uno tiene su propia acción).
   useEffect(() => {
-    if (done) return;
+    if (done && !esperandoSiguiente) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        skip();
-      }
+      if (e.repeat || !teclaAvanza(e.key, e.target as HTMLElement | null)) return;
+      e.preventDefault();
+      if (!done) skip();
+      else siguiente();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [done, skip]);
+  }, [done, esperandoSiguiente, skip, siguiente]);
 
   const waitingIntervention =
     status === "paused" &&
@@ -233,7 +235,7 @@ export default function DebateArena({
     setDesenlace(await debate.pedirDesenlace(quien));
   };
 
-  const cajaClicable = !done && !enFinal;
+  const alHacerClicEnCaja = enFinal ? undefined : !done ? skip : esperandoSiguiente ? siguiente : undefined;
   const nombreCaja = speaker ? NOMBRES[speaker] : "";
 
   return (
@@ -295,7 +297,7 @@ export default function DebateArena({
 
       <div
         className="caja-dialogo"
-        onClick={cajaClicable ? skip : undefined}
+        onClick={alHacerClicEnCaja}
         role="region"
         aria-live="polite"
         aria-label="Cuadro de diálogo"
@@ -356,8 +358,17 @@ export default function DebateArena({
                 <span aria-hidden="true">👍</span>
               </button>
             )}
-            {done && !thinking && !waitingIntervention && !error && status === "running" && (
-              <span className="caja-flecha" aria-hidden="true">▼</span>
+            {done && !thinking && !waitingIntervention && !error && status === "running" && esperandoSiguiente && (
+              <button
+                className="caja-flecha"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  siguiente();
+                }}
+                aria-label="Siguiente"
+              >
+                Siguiente <span className="caja-flecha-triangulo" aria-hidden="true">▼</span>
+              </button>
             )}
           </>
         )}

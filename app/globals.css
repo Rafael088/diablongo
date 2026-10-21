@@ -107,7 +107,13 @@ input[type="range"]::-webkit-slider-thumb {
 .caja-nombre { font-family: var(--font-titulo), ui-monospace, monospace; font-size: 0.7rem; margin-bottom: 8px; }
 .caja-texto { white-space: pre-wrap; }
 .caja-cursor { display: inline-block; width: 0.6em; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: var(--caja-texto); }
-.caja-flecha { position: absolute; right: 12px; bottom: 6px; font-size: 0.8rem; }
+.caja-flecha {
+  position: absolute; right: 12px; bottom: 6px; padding: 2px 6px; font: inherit; font-size: 0.8rem;
+  background: transparent; color: inherit; border: 2px solid transparent; cursor: pointer;
+}
+.caja-flecha:hover, .caja-flecha:focus-visible { border-color: var(--caja-borde); }
+.caja-flecha-triangulo { display: inline-block; animation: caja-parpadeo 1s steps(2, start) infinite; }
+@keyframes caja-parpadeo { to { visibility: hidden; } }
 .caja-centro { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 6rem; text-align: center; }
 .caja-aviso { margin-top: 8px; opacity: 0.75; font-size: 0.8rem; }
 .caja-error { margin-top: 8px; color: var(--arena-error); font-size: 0.85rem; }
@@ -221,6 +227,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
+  .caja-flecha-triangulo { animation: none; }
 }
 
 /* Selector de modo (Gratis / Conectar OpenRouter / Mi key) y avisos de la configuración */
