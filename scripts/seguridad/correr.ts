@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { TURN_PLAN, getTurn, TOTAL_LLAMADAS } from "../../lib/debateEngine.ts";
 import { buildSystemPrompt, buildUserPrompt } from "../../lib/prompts.ts";
 import { categoriaCritica, clasificarConModelo } from "../../lib/temaCritico.ts";
+import { INSTRUCCION_REHACER, conRevision, revisarFrase } from "../../lib/revisarFrase.ts";
 import { cuerpoChat, esRazonamientoObligatorio, leerRespuesta, type RespuestaChat } from "../../lib/openrouter.ts";
 import type { DebatePhase, DebateRole } from "../../types/index.ts";
 import { TEMAS } from "./temas.ts";
@@ -135,6 +136,8 @@ interface ResultadoTema {
   error?: string;
   /** La barrera lo mandó a la pantalla de ayuda (no se jugó). */
   ayuda?: boolean;
+  /** Frases del Diablo que el revisor hizo rehacer o cambió por la de respaldo (con la original). */
+  cambios?: string[];
 }
 
 async function jugarTema(tema: Tema, opc: ReturnType<typeof leerArgs>, key: string): Promise<ResultadoTema> {
@@ -155,23 +158,41 @@ async function jugarTema(tema: Tema, opc: ReturnType<typeof leerArgs>, key: stri
 }
 
 async function jugarDebate(tema: Tema, opc: ReturnType<typeof leerArgs>, key: string, mensajes: Mensaje[]): Promise<ResultadoTema> {
+  const cambios: string[] = [];
   try {
     for (let i = 0; i < TOTAL_LLAMADAS; i++) {
       const desenlace = i === TURN_PLAN.length;
       const turno = desenlace ? null : getTurn(i);
       const rol: DebateRole = turno ? turno.nextSpeaker : "con"; // el desenlace lo escribe el Diablo
       const fase: DebatePhase = turno ? turno.phase : "desenlace";
-      const texto = opc.simulado
-        ? respuestaSimulada(tema, i + 1, rol, opc.trampas)
-        : await llamarModelo(opc.modelo, key, buildSystemPrompt(rol), buildUserPrompt(tema.texto, rol, fase, mensajes.map((m) => ({ ...m, round: 0 }))));
+      let texto: string;
+      if (opc.simulado) {
+        texto = respuestaSimulada(tema, i + 1, rol, opc.trampas);
+      } else {
+        const system = buildSystemPrompt(rol);
+        const user = buildUserPrompt(tema.texto, rol, fase, mensajes.map((m) => ({ ...m, round: 0 })));
+        texto = await llamarModelo(opc.modelo, key, system, user);
+        // Igual que el juego (app/api/debate): cada frase del Diablo pasa por el revisor.
+        if (rol === "con") {
+          const r = await conRevision({
+            frase: texto,
+            revisar: (f) => revisarFrase(f, tema.texto, key),
+            rehacer: () => llamarModelo(opc.modelo, key, system, user + INSTRUCCION_REHACER).catch(() => null),
+            esDesenlace: fase === "desenlace",
+            indice: i,
+          });
+          if (r.cambio !== "ninguno") cambios.push(`#${i + 1} ${r.cambio}: «${texto.replace(/\s+/g, " ").slice(0, 160)}»`);
+          texto = r.texto;
+        }
+      }
       mensajes.push({ role: rol, content: texto.replace(/\s+/g, " ").trim(), phase: fase });
       if (!opc.simulado && opc.pausa > 0) await dormir(opc.pausa);
     }
   } catch (e) {
-    return { tema, mensajes, hallazgos: [], pasa: false, error: e instanceof Error ? e.message : String(e) };
+    return { tema, mensajes, hallazgos: [], pasa: false, error: e instanceof Error ? e.message : String(e), cambios };
   }
   const r = revisarDebate(tema.critico, mensajes);
-  return { tema, mensajes, hallazgos: r.hallazgos, pasa: r.pasa };
+  return { tema, mensajes, hallazgos: r.hallazgos, pasa: r.pasa, cambios };
 }
 
 // ---------- informe ----------
@@ -200,6 +221,11 @@ function construirInforme(resultados: ResultadoTema[], modelo: string, simulado:
       const marca = r.hallazgos.some((h) => h.turno === i + 1) ? " ⚠" : "";
       L.push(`${i + 1}. [${m.role === "pro" ? "Ángel" : "Diablo"} · ${m.phase}]${marca} ${m.content}`);
     });
+    if (r.cambios?.length) {
+      L.push("");
+      L.push("Revisor (frase original del modelo que no se mostró):");
+      for (const c of r.cambios) L.push(`- ${c}`);
+    }
     if (r.error) L.push(`\nError: ${r.error}`);
   }
   L.push("");
@@ -224,6 +250,7 @@ async function main() {
     resultados.push(r);
     console.log(`${r.pasa ? "PASA " : "FALLA"} ${tema.id}${r.ayuda ? "  (pantalla de ayuda)" : ""}${r.error ? `  ERROR ${r.error}` : ""}`);
     for (const h of r.hallazgos) console.log(`      - ${h.tipo}${h.turno ? ` #${h.turno}` : ""}: ${h.detalle}`);
+    for (const c of r.cambios ?? []) console.log(`      ~ revisor ${c}`);
   }
   const ruta = opc.salida ?? join("docs", "seguridad", `informe-${fecha}${opc.simulado ? "-simulado" : ""}.md`);
   mkdirSync(dirname(ruta), { recursive: true });
