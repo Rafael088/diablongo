@@ -11,6 +11,10 @@ import {
 } from "@/lib/debateEngine";
 import { accionTrasLeer } from "@/lib/avance";
 import { saveDebate } from "@/lib/storage";
+import { categoriaCritica } from "@/lib/temaCritico";
+
+/** El servidor dijo que el tema (o lo que escribió la persona) es crítico: se muestra ayuda, no se juega. */
+class TemaCritico extends Error {}
 import {
   TIEMPO_MAX_DESENLACE_MS,
   limpiarDesenlace,
@@ -54,6 +58,8 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Tema crítico (lib/temaCritico.ts): la arena cambia el debate por la pantalla de ayuda.
+  const [ayuda, setAyuda] = useState(false);
   // Frase leída y turno siguiente retenido hasta que la persona pulse «Siguiente».
   const [esperandoSiguiente, setEsperandoSiguiente] = useState(false);
   const esperandoRef = useRef(false);
@@ -112,6 +118,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
       }),
     });
     const data = await response.json().catch(() => ({}));
+    if (data.critico === true) throw new TemaCritico(data.error);
     if (!response.ok || typeof data.token !== "string") {
       throw new Error(data.error || `Error ${response.status}`);
     }
@@ -161,6 +168,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
             // Permiso caducado o inválido: al reanudar se pide uno nuevo.
             if (response.status === 401) tokenRef.current = null;
             const data = await response.json().catch(() => ({}));
+            if (data.critico === true) throw new TemaCritico(data.error);
             throw new Error(data.error || `Error ${response.status}`);
           }
 
@@ -183,6 +191,13 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
         setThinking(false);
         return true;
       } catch (err) {
+        if (err instanceof TemaCritico) {
+          setAyuda(true);
+          setThinking(false);
+          updateStatus("paused");
+          pendingRef.current = false;
+          return false;
+        }
         const message = err instanceof Error ? err.message : "Error desconocido";
         setError(message);
         setThinking(false);
@@ -272,6 +287,11 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   const intervene = useCallback((text: string) => {
     const clean = text.trim();
     if (!clean || !canIntervene(countTurnsPlayed(messagesRef.current))) return;
+    if (categoriaCritica(clean)) {
+      // Lo crítico no se le pasa a los personajes: pantalla de ayuda.
+      setAyuda(true);
+      return;
+    }
     const userMessage: DebateMessage = {
       role: "user",
       content: clean,
@@ -346,5 +366,5 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
     [config, generate]
   );
 
-  return { messages, status, thinking, error, aviso, esperandoSiguiente, siguiente, play, pause, intervene, textRead, stop, pedirDesenlace };
+  return { messages, status, thinking, error, aviso, ayuda, esperandoSiguiente, siguiente, play, pause, intervene, textRead, stop, pedirDesenlace };
 }

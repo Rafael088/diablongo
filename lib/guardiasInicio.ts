@@ -5,6 +5,7 @@ import type { ConfigInicio } from "./tokenDebate.ts";
 import { clienteServidor } from "./supabase/servidor.ts";
 import { clienteAdmin } from "./supabase/admin.ts";
 import { descontarDebate } from "./creditos.ts";
+import { MENSAJE_TEMA_CRITICO, esTemaCritico } from "./temaCritico.ts";
 import {
   CREDITOS_POR_DEBATE,
   MENSAJE_CREDITOS_INSUFICIENTES,
@@ -22,7 +23,7 @@ import {
  * Aquí se enchufan las tareas siguientes, sin tocar la ruta:
  *  - cotejo-xqsxp8: límite diario por IP (3 debates) y cupo global en Upstash.
  *  - cotejo-tkwelc: descontar créditos de pago al empezar (guardiaCreditos).
- * Orden recomendado: Turnstile → límite por IP → cupo global → créditos (lo que
+ * Orden recomendado: Turnstile → tema crítico → límite por IP → cupo global → créditos (lo que
  * cuesta dinero o cupo, al final, para no gastarlo si una guardia anterior rechaza).
  * Los mensajes de error no deben repetir nada de lo que mandó el usuario.
  */
@@ -57,6 +58,16 @@ export type GuardiaInicio = (ctx: ContextoInicio) => Promise<RechazoGuardia | nu
 export const guardiaTurnstile: GuardiaInicio = async (ctx) => {
   const r = await verificarTurnstile(ctx.cuerpo.turnstile, ipDe(ctx.request));
   return r.ok ? null : { status: r.status, error: r.error };
+};
+
+/**
+ * Tema crítico (cotejo-z7mrnc): hacerse daño, dejar de comer, drogas duras o retos que lastiman no se
+ * juegan. Va DESPUÉS de Turnstile (un bot no gasta el clasificador) y ANTES del límite y los créditos
+ * (no cuesta cupo ni dinero). Responde 422 con `critico: true` y el cliente muestra la pantalla de ayuda.
+ */
+export const guardiaTemaCritico: GuardiaInicio = async (ctx) => {
+  if (!(await esTemaCritico(ctx.config.topic, process.env.OPENROUTER_API_KEY))) return null;
+  return { status: 422, error: MENSAJE_TEMA_CRITICO, campos: { critico: true } };
 };
 
 /**
@@ -105,7 +116,7 @@ export const guardiaCreditos: GuardiaInicio = async (ctx) => {
   }
 };
 
-export const GUARDIAS_INICIO: GuardiaInicio[] = [guardiaTurnstile, guardiaLimiteGratis, guardiaCreditos];
+export const GUARDIAS_INICIO: GuardiaInicio[] = [guardiaTurnstile, guardiaTemaCritico, guardiaLimiteGratis, guardiaCreditos];
 
 export async function pasarGuardias(
   ctx: ContextoInicio,

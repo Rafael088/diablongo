@@ -15,6 +15,7 @@ import {
   PROVEEDOR_CREDITOS,
 } from "@/lib/creditosDebate";
 import { acreditarCompra } from "@/lib/creditos";
+import { PROMPT_CLASIFICADOR } from "@/lib/temaCritico";
 import { RegistroTurnosMemoria, usarRegistroTurnos } from "@/lib/registroTurnos";
 import { emitirToken, verificarToken } from "@/lib/tokenDebate";
 import { validarProveedorModelo } from "@/lib/validarTurno";
@@ -66,7 +67,11 @@ beforeEach(async () => {
       if (u.includes("turnstile")) {
         return new Response(JSON.stringify({ success: true, action: "iniciar-debate" }), { status: 200 });
       }
-      const cuerpo = JSON.parse(String(init?.body)) as { model: string };
+      const cuerpo = JSON.parse(String(init?.body)) as { model: string; messages: { content: string }[] };
+      // El clasificador de temas críticos (lib/temaCritico.ts) responde aparte y no cuenta como turno.
+      if (cuerpo.messages?.[0]?.content === PROMPT_CLASIFICADOR) {
+        return new Response(JSON.stringify({ choices: [{ message: { content: "NO" } }] }), { status: 200 });
+      }
       const key = String((init?.headers as Record<string, string>).Authorization).replace("Bearer ", "");
       llamadas.push({ modelo: cuerpo.model, key });
       const r = respuestas[cuerpo.model] ?? "Respuesta del modelo";

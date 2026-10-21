@@ -1,5 +1,6 @@
 "use client";
 
+import PantallaAyuda from "./PantallaAyuda";
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -214,6 +215,8 @@ export default function DebateArena({
     debate.stop();
     onReset();
   };
+
+  if (debate.ayuda) return <PantallaAyuda onVolver={handleReset} />;
 
   const decir = () => {
     const text = interventionText.trim();

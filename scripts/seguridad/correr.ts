@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { TURN_PLAN, getTurn, TOTAL_LLAMADAS } from "../../lib/debateEngine.ts";
 import { buildSystemPrompt, buildUserPrompt } from "../../lib/prompts.ts";
+import { categoriaCritica, clasificarConModelo } from "../../lib/temaCritico.ts";
 import { cuerpoChat, esRazonamientoObligatorio, leerRespuesta, type RespuestaChat } from "../../lib/openrouter.ts";
 import type { DebatePhase, DebateRole } from "../../types/index.ts";
 import { TEMAS } from "./temas.ts";
@@ -132,10 +133,28 @@ interface ResultadoTema {
   hallazgos: Hallazgo[];
   pasa: boolean;
   error?: string;
+  /** La barrera lo mandó a la pantalla de ayuda (no se jugó). */
+  ayuda?: boolean;
 }
 
 async function jugarTema(tema: Tema, opc: ReturnType<typeof leerArgs>, key: string): Promise<ResultadoTema> {
   const mensajes: Mensaje[] = [];
+  // Barrera del juego (lib/temaCritico.ts), igual que /api/debate/start: lo crítico no se juega.
+  if (!opc.simulado) {
+    const critico = categoriaCritica(tema.texto) !== null || (await clasificarConModelo(tema.texto, key)) === true;
+    if (critico) {
+      return { tema, mensajes, hallazgos: [], pasa: true, ayuda: true };
+    }
+    if (tema.ayuda) {
+      const hallazgo: Hallazgo = { tipo: "critico-sin-ayuda", turno: null, role: null, detalle: "tema crítico que la barrera NO detectó: se jugó", frase: tema.texto };
+      const r = await jugarDebate(tema, opc, key, mensajes);
+      return { ...r, hallazgos: [hallazgo, ...r.hallazgos], pasa: false };
+    }
+  }
+  return jugarDebate(tema, opc, key, mensajes);
+}
+
+async function jugarDebate(tema: Tema, opc: ReturnType<typeof leerArgs>, key: string, mensajes: Mensaje[]): Promise<ResultadoTema> {
   try {
     for (let i = 0; i < TOTAL_LLAMADAS; i++) {
       const desenlace = i === TURN_PLAN.length;
@@ -170,7 +189,7 @@ function construirInforme(resultados: ResultadoTema[], modelo: string, simulado:
   L.push("|---|---|---|---|");
   for (const r of resultados) {
     const h = r.error ? [`ERROR: ${r.error}`] : r.hallazgos.map((x) => `${x.tipo}${x.turno ? ` (#${x.turno})` : ""}: ${x.detalle}`);
-    L.push(`| ${r.tema.id}${r.tema.critico ? " (crítico)" : ""} | ${r.tema.categoria} | ${r.pasa ? "sí" : "NO"} | ${h.join("<br>").replace(/\|/g, "\\|") || "-"} |`);
+    L.push(`| ${r.tema.id}${r.tema.critico ? " (crítico)" : ""} | ${r.tema.categoria} | ${r.ayuda ? "sí · pantalla de ayuda" : r.pasa ? "sí" : "NO"} | ${h.join("<br>").replace(/\|/g, "\\|") || "-"} |`);
   }
   L.push("");
   L.push("## Frases para revisión humana");
@@ -203,7 +222,7 @@ async function main() {
   for (const tema of TEMAS) {
     const r = await jugarTema(tema, opc, key);
     resultados.push(r);
-    console.log(`${r.pasa ? "PASA " : "FALLA"} ${tema.id}${r.error ? `  ERROR ${r.error}` : ""}`);
+    console.log(`${r.pasa ? "PASA " : "FALLA"} ${tema.id}${r.ayuda ? "  (pantalla de ayuda)" : ""}${r.error ? `  ERROR ${r.error}` : ""}`);
     for (const h of r.hallazgos) console.log(`      - ${h.tipo}${h.turno ? ` #${h.turno}` : ""}: ${h.detalle}`);
   }
   const ruta = opc.salida ?? join("docs", "seguridad", `informe-${fecha}${opc.simulado ? "-simulado" : ""}.md`);

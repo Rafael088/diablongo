@@ -27,6 +27,7 @@ const MENSAJE_RESPUESTA_CORTADA =
   "El modelo no terminó la frase (se quedó sin espacio). Vuelve a intentarlo o prueba otro modelo.";
 import { MENSAJE_SIN_SECRETO, comprobarTurno, obtenerSecreto, verificarToken } from "@/lib/tokenDebate";
 import { obtenerRegistroTurnos, type RegistroTurnos } from "@/lib/registroTurnos";
+import { MENSAJE_TEMA_CRITICO, esTemaCritico } from "@/lib/temaCritico";
 import { TOTAL_TURNS } from "@/lib/debateEngine";
 import {
   AVISO_RESPALDO_CREDITOS,
@@ -122,6 +123,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const debateId = permiso.payload.id;
     if (!(await registro.marcar(debateId, turno.indice, permiso.payload.exp))) {
       return NextResponse.json({ error: "Ese turno del debate ya se jugó." }, { status: 409 });
+    }
+
+    // Lo que el usuario escribe a mitad del debate pasa por la misma barrera que el tema.
+    if (intervention && (await esTemaCritico(intervention, process.env.OPENROUTER_API_KEY))) {
+      await registro.liberar(debateId, turno.indice);
+      return NextResponse.json({ error: MENSAJE_TEMA_CRITICO, critico: true }, { status: 422 });
     }
 
     const systemPrompt = buildSystemPrompt(role);
