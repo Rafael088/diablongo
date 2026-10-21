@@ -8,8 +8,8 @@ import {
   countTurnsPlayed,
   getTurn,
   pendingIntervention,
-  shouldPauseForIntervention,
 } from "@/lib/debateEngine";
+import { accionTrasLeer } from "@/lib/avance";
 import { saveDebate } from "@/lib/storage";
 import {
   TIEMPO_MAX_DESENLACE_MS,
@@ -44,7 +44,8 @@ interface UseDebateOptions {
 
 /**
  * Bucle de turnos del debate. El siguiente turno no arranca hasta que la
- * pantalla avisa con `textRead()` de que el texto actual se terminó de escribir.
+ * pantalla avisa con `textRead()` de que el texto se escribió y la persona
+ * pulsa «Siguiente» (`siguiente()`), salvo en la pausa de intervención y el final.
  */
 export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) {
   const { generate, initialMessages, initialStatus = "idle", persist = true, turnstile } = options;
@@ -53,6 +54,9 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Frase leída y turno siguiente retenido hasta que la persona pulse «Siguiente».
+  const [esperandoSiguiente, setEsperandoSiguiente] = useState(false);
+  const esperandoRef = useRef(false);
 
   const pendingRef = useRef(false);
   const messagesRef = useRef<DebateMessage[]>(initialMessages ?? []);
@@ -86,6 +90,11 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
       }),
     []
   );
+
+  const fijarEspera = useCallback((valor: boolean) => {
+    esperandoRef.current = valor;
+    setEsperandoSiguiente(valor);
+  }, []);
 
   /** Pide el token del debate la primera vez; si /start falla, lanza su mensaje. */
   const asegurarToken = useCallback(async (): Promise<string> => {
@@ -209,9 +218,9 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
     await waitUntilRead();
 
     const done = countTurnsPlayed(messagesRef.current);
-    const next = getTurn(done);
+    const accion = accionTrasLeer(done);
 
-    if (!next) {
+    if (accion === "terminar") {
       updateStatus("finished");
       pendingRef.current = false;
       if (persist) {
@@ -227,32 +236,34 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
       return;
     }
 
-    if (shouldPauseForIntervention(done)) {
+    pendingRef.current = false;
+
+    if (accion === "pausar") {
       // Mitad del debate: pausa para que el usuario pueda intervenir.
       updateStatus("paused");
-      pendingRef.current = false;
       return;
     }
 
-    pendingRef.current = false;
-
-    if (statusRef.current === "running") {
-      setTimeout(() => {
-        if (statusRef.current === "running") {
-          runNextTurnRef.current();
-        }
-      }, 400);
-    }
-  }, [config.topic, executeTurn, persist, updateStatus, waitUntilRead]);
+    // Tiempo de leer y de dar 👍: el siguiente turno espera a `siguiente()`.
+    if (statusRef.current === "running") fijarEspera(true);
+  }, [config.topic, executeTurn, fijarEspera, persist, updateStatus, waitUntilRead]);
 
   useEffect(() => {
     runNextTurnRef.current = runNextTurn;
   }, [runNextTurn]);
 
+  /** «Siguiente»: la persona ya leyó; se pide el turno que estaba retenido. */
+  const siguiente = useCallback(() => {
+    if (!esperandoRef.current || statusRef.current !== "running") return;
+    fijarEspera(false);
+    runNextTurnRef.current();
+  }, [fijarEspera]);
+
   const play = useCallback(() => {
+    fijarEspera(false);
     updateStatus("running");
     setTimeout(() => runNextTurnRef.current(), 100);
-  }, [updateStatus]);
+  }, [fijarEspera, updateStatus]);
 
   const pause = useCallback(() => updateStatus("paused"), [updateStatus]);
 
@@ -276,6 +287,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
     pendingRef.current = false;
     statusRef.current = "idle";
     tokenRef.current = null;
+    esperandoRef.current = false;
   }, []);
 
   /**
@@ -334,5 +346,5 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
     [config, generate]
   );
 
-  return { messages, status, thinking, error, aviso, play, pause, intervene, textRead, stop, pedirDesenlace };
+  return { messages, status, thinking, error, aviso, esperandoSiguiente, siguiente, play, pause, intervene, textRead, stop, pedirDesenlace };
 }
