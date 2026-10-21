@@ -21,7 +21,7 @@ import type { Hallazgo, Mensaje } from "./revisor.ts";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 // Por defecto, el modelo gratis del Diablo en el juego: MODELOS_GRATIS.con[0] de lib/gratis.ts (no se
 // importa: node no puede quitar los tipos de ese archivo). Si cambia allí, cambiarlo aquí.
-const MODELO_DEFECTO = "google/gemma-4-26b-a4b-it:free";
+const MODELO_DEFECTO = "google/gemini-3.1-flash-lite";
 
 // ---------- argumentos y entorno ----------
 function leerArgs(argv: string[]) {

@@ -36,7 +36,7 @@ Cada modo define quién pone la API key y cuáles modelos se usan.
 
 | Modo | Proveedor | Key | Donde vive | Límite |
 | --- | --- | --- | --- | --- |
-| **Gratis** | OpenRouter, modelos `:free` | Servidor (`OPENROUTER_API_KEY`) | Modelos en `lib/gratis.ts` | 3 debates/IP/día y cupo global (Upstash; en desarrollo, memoria). |
+| **Gratis** | OpenRouter: Haiku 5.5 / Gemini 3.1 Flash Lite pagados por el servidor, `:free` de respaldo | Servidor (`OPENROUTER_API_KEY`) | Modelos en `lib/gratis.ts` | 3 debates/IP/día y cupo global (Upstash; en desarrollo, memoria). |
 | **Conectar OpenRouter** | OpenRouter (usuario) | OAuth PKCE (navegador) | Sesión y `sessionStorage`, nunca a nuestro servidor | Sin límite. |
 | **Mi key** | Elegible: OpenRouter, Gemini, Groq, Ollama (local) | Usuario (navegador o localStorage) | Pestaña o dispositivo (localStorage si marca «Recordar») | Sin límite. |
 | **Con créditos** | OpenRouter, modelos de pago | Servidor (`OPENROUTER_API_KEY`) + Supabase | Modelos en `lib/creditosDebate.ts`; modelos: Claude Haiku 5.5 / Gemini 3.1 Flash Lite para PRO, Gemini 3.1 Flash Lite / DeepSeek V4 Pro para CON (respaldos) | 1 crédito por debate; saldo en `supabase.public.saldos`. Se devuelve si fallan antes de terminar. |

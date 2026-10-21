@@ -1,25 +1,32 @@
 import type { DebateRole, ProviderConfig } from "../types/index.ts";
 
-// MODO GRATIS: la persona no pone key ni elige modelo. La petición solo dice provider: "gratis".
+// MODO GRATIS: la persona no pone key ni elige modelo ni paga. La petición solo dice provider: "gratis".
 // El SERVIDOR usa su OPENROUTER_API_KEY y elige el modelo de MODELOS_GRATIS; cualquier model o
 // apiKey que mande el cliente en este modo se ignora (lib/validarTurno.ts y la ruta).
 export const PROVEEDOR_GRATIS = "gratis";
 
 export const MENSAJE_GRATIS_NO_DISPONIBLE = "El modo gratis no está disponible ahora.";
 
-// Verificados el 2026-10-19 en la API pública https://openrouter.ai/api/v1/models (sin key): los 4 existen,
-// cuestan 0 y aceptan max_tokens. Solo Gemma 4 anuncia modo de razonamiento «configurable» (apagado por defecto);
-// Laguna son modelos de agente/código, pero sin razonamiento obligatorio documentado. Se descartaron los demás
-// :free por razonar siempre (nemotron, minimax, inkling, lfm...) o por ser pequeños/de visión sin interés aquí.
-// OJO: no he podido probarlos con key; si alguno devuelve vacío con MAX_TOKENS_RESPUESTA = 120, bajarlo de la lista.
-//
-// Ordenados por preferencia y separados por personaje para que Ángel (pro) y Diablo (con) no hablen con el mismo
-// modelo mientras haya alternativa. La ruta usa el primero; el respaldo ante 429 (otra tarea) probará el siguiente
-// con elegirModeloGratis(rol, intento).
-// Regla: todo ID termina en ":free" (tests/gratis.test.ts lo vigila). Nada de pago.
+// «Gratis» es gratis PARA QUIEN JUEGA: el servidor paga. Decisión del 2026-10-21 (cotejo-hv4to6):
+// - Los :free de antes (Gemma 4) dieron 429 «rate-limited upstream» en TODAS las pruebas del 20 y 21-oct.
+// - Probados en vivo el 21-oct con la key del proyecto (3 llamadas cada uno, prompts del juego, razonamiento
+//   apagado): responden Nemotron 3 Ultra, Nemotron 3.5 Lightning, Dots 3 Note y Laguna S; Inkling (403),
+//   Nemotron 3 Super (404) y Xing (429) no.
+// - Prueba de seguridad con la barrera (docs/seguridad/revision-2026-10-21-gratis.md): Nemotron Ultra y Dots,
+//   en el papel del Diablo, empujaban al acto y daban métodos en temas delicados pese al prompt; Gemini 3.1
+//   Flash Lite pasó los 8 a mano. Por eso el Diablo va primero con Gemini 3.1 Flash Lite (de pago, barato:
+//   ~0,0026 USD por debate; con CUPO_GLOBAL_DIARIO = 111, como mucho ~0,29 USD al día) y el Ángel con Claude
+//   Haiku 5.5 (0,10/0,50 USD por millón; el Ángel no tienta). Los :free quedan solo de respaldo ante 429.
+// - Los :free del Diablo son menos fiables en seguridad: la revisión de cada frase del Diablo (cotejo-91ekmf)
+//   es la barrera para ellos.
+// Ordenados por preferencia; Ángel (pro) y Diablo (con) sin modelos en común. La ruta usa el primero y el
+// respaldo ante 429/5xx prueba el siguiente con elegirModeloGratis(rol, intento).
+// Regla: todo ID es :free o está en MODELOS_PAGO_DEL_SERVIDOR (tests/gratis.test.ts lo vigila).
+export const MODELOS_PAGO_DEL_SERVIDOR: readonly string[] = ["anthropic/claude-haiku-5.5", "google/gemini-3.1-flash-lite"];
+
 export const MODELOS_GRATIS: Record<DebateRole, readonly string[]> = {
-  pro: ["google/gemma-4-31b-it:free", "poolside/laguna-xs-2.1:free"],
-  con: ["google/gemma-4-26b-a4b-it:free", "poolside/laguna-s-2.1:free"],
+  pro: ["anthropic/claude-haiku-5.5", "nvidia/nemotron-3-ultra-550b-a55b:free", "poolside/laguna-xs-2.1:free"],
+  con: ["google/gemini-3.1-flash-lite", "poolside/laguna-s-2.1:free", "nvidia/nemotron-3.5-lightning:free"],
 };
 
 /** Modelo gratis del personaje; `intento` 0 es el preferido, 1 el siguiente (respaldo). undefined si se acabaron. */

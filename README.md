@@ -31,7 +31,7 @@ Pon a dos IAs a debatir cualquier tema. Ángel vs Diablo en una arena visual de 
 ## Modos de juego
 
 ### Gratis
-Sin API key. El servidor usa su `OPENROUTER_API_KEY` con modelos `:free` (lista en `lib/gratis.ts`, con respaldo si uno falla); 3 debates por día por IP y un cupo global diario. La configuración muestra cuántos te quedan hoy.
+Sin API key y sin pagar: el servidor usa su `OPENROUTER_API_KEY` y paga modelos baratos (Claude Haiku 5.5 para el Ángel, Gemini 3.1 Flash Lite para el Diablo), con modelos `:free` de respaldo (lista en `lib/gratis.ts`); 3 debates por día por IP y un cupo global diario. La configuración muestra cuántos te quedan hoy.
 
 ### Conectar OpenRouter
 Conecta tu cuenta OpenRouter con OAuth PKCE en el navegador. La key solo vive en tu pestaña; nunca se envía a nuestro servidor.

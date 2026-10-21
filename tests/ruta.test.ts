@@ -416,11 +416,14 @@ describe("modo gratis: respaldo entre modelos", () => {
 
   it("caída 5xx o error de red: pasa al siguiente", async () => {
     fetchMock.mockReset();
-    fetchMock.mockResolvedValueOnce(new Response("boom", { status: 503 })).mockRejectedValueOnce(new TypeError("fetch failed"));
-    // la lista tiene 2 modelos: si ambos caen, error claro; con un tercero de prueba no hay, así que comprobamos el paso del 5xx
+    fetchMock.mockImplementation(async () => {
+      throw new TypeError("fetch failed");
+    });
+    fetchMock.mockResolvedValueOnce(new Response("boom", { status: 503 }));
+    // 5xx en el primero y caída de red en los demás: los prueba todos y da un error claro.
     const r = await llamar(gratis);
     expect(r.status).toBe(503);
-    expect(modelosLlamados()).toHaveLength(2);
+    expect(modelosLlamados()).toEqual([...MODELOS_GRATIS.pro]);
 
     fetchMock.mockReset();
     fetchMock.mockRejectedValueOnce(new TypeError("fetch failed")).mockResolvedValueOnce(ok());
