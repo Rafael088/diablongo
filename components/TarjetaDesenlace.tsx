@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { MARCA_TARJETA, nombreArchivoTarjeta, temaCorto, type Bando } from "@/lib/desenlace";
+import {
+  MENSAJE_ERROR_COMPARTIR,
+  MENSAJE_ERROR_DESCARGA,
+  canvasABlob,
+  descargarCanvas,
+} from "@/lib/descargaTarjeta";
 import { TOKENS } from "@/lib/paleta";
 import { TAMANO_SPRITE, matrizDe, rectsDeMatriz } from "@/lib/sprites";
 
@@ -148,45 +154,48 @@ export default function TarjetaDesenlace({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const volcadoRef = useRef<HTMLOutputElement>(null);
   const compartir = useSyncExternalStore(sinSuscripcion, puedeCompartirArchivos, () => false);
+  const [lista, setLista] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let vigente = true;
+    setLista(false);
+    setError(null);
     const fuentes = leerFuentes();
     // Hasta que las fuentes carguen no se pinta: así el PNG nunca sale con la tipografía de reserva.
     void cargarFuentes(fuentes, [tema, desenlace, ETIQUETA[ganador], MARCA_TARJETA, "* TU DECISIÓN"]).then(() => {
       if (!vigente) return;
       pintarTarjeta(canvas, fuentes, tema, desenlace, ganador);
       if (volcado && volcadoRef.current) volcadoRef.current.textContent = canvas.toDataURL("image/png");
+      setLista(true);
     });
     return () => {
       vigente = false;
     };
   }, [tema, desenlace, ganador, volcado]);
 
-  const aBlob = () =>
-    new Promise<Blob | null>((resolver) => canvasRef.current?.toBlob(resolver, "image/png") ?? resolver(null));
-
   const descargar = async () => {
-    const blob = await aBlob();
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const enlace = document.createElement("a");
-    enlace.href = url;
-    enlace.download = nombreArchivoTarjeta(tema);
-    enlace.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setError(null);
+    const r = await descargarCanvas(canvasRef.current, nombreArchivoTarjeta(tema));
+    if (!r.ok) setError(MENSAJE_ERROR_DESCARGA);
   };
 
   const compartirTarjeta = async () => {
-    const blob = await aBlob();
-    if (!blob) return;
-    const archivo = new File([blob], nombreArchivoTarjeta(tema), { type: "image/png" });
+    setError(null);
+    const canvas = canvasRef.current;
+    const blob = canvas ? await canvasABlob(canvas) : null;
+    if (!blob) {
+      setError(MENSAJE_ERROR_COMPARTIR);
+      return;
+    }
     try {
+      const archivo = new File([blob], nombreArchivoTarjeta(tema), { type: "image/png" });
       await navigator.share({ files: [archivo], title: MARCA_TARJETA, text: desenlace });
-    } catch {
-      // el usuario canceló el menú de compartir
+    } catch (e) {
+      // AbortError: la persona cerró el menú de compartir; cualquier otro fallo se avisa.
+      if (!(e instanceof DOMException && e.name === "AbortError")) setError(MENSAJE_ERROR_COMPARTIR);
     }
   };
 
@@ -201,18 +210,23 @@ export default function TarjetaDesenlace({
         aria-label={`Tarjeta de desenlace: ${desenlace}`}
       />
       <div className="caja-botones tarjeta-botones">
-        <button className="caja-boton" onClick={descargar}>
+        <button type="button" className="caja-boton" onClick={descargar} disabled={!lista}>
           Descargar PNG
         </button>
         {compartir && (
-          <button className="caja-boton" onClick={compartirTarjeta}>
+          <button type="button" className="caja-boton" onClick={compartirTarjeta} disabled={!lista}>
             Compartir
           </button>
         )}
-        <button className="caja-boton" onClick={onJugarOtra}>
+        <button type="button" className="caja-boton" onClick={onJugarOtra}>
           Jugar otra vez
         </button>
       </div>
+      {error && (
+        <p className="tarjeta-error" role="alert">
+          {error}
+        </p>
+      )}
       {volcado && <output ref={volcadoRef} id="png-tarjeta" hidden />}
     </div>
   );
