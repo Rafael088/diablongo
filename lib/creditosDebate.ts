@@ -8,14 +8,16 @@ export const PROVEEDOR_CREDITOS = "creditos";
 
 // PROVISIONAL: modelos y costo los decide una persona con el costo real (tarea cotejo-j9s6uq).
 // Precios en la API pública de OpenRouter el 2026-10-20 (USD por millón de tokens, entrada/salida):
-//   anthropic/claude-haiku-5.5  0,10 / 0,50
-//   google/gemini-3.8-flash     0,825 / 4,125
-//   deepseek/deepseek-v4-pro    0,351 / 0,703
+//   anthropic/claude-haiku-5.5    0,10 / 0,50
+//   google/gemini-3.1-flash-lite  0,25 / 1,50
+//   deepseek/deepseek-v4-pro      0,351 / 0,703
+// Los tres dejan apagar el razonamiento (lib/openrouter.ts). NO usar modelos con razonamiento
+// obligatorio (p. ej. google/gemini-3.8-flash): con el tope corto la frase sale cortada.
 // Un debate son 9 llamadas cortas (MAX_TOKENS_RESPUESTA de salida): menos de 2 centavos de dólar.
 // Uno distinto por personaje mientras haya alternativa; el siguiente de la lista es el respaldo.
 export const MODELOS_CREDITOS: Record<DebateRole, readonly string[]> = {
-  pro: ["anthropic/claude-haiku-5.5", "google/gemini-3.8-flash"],
-  con: ["google/gemini-3.8-flash", "deepseek/deepseek-v4-pro"],
+  pro: ["anthropic/claude-haiku-5.5", "google/gemini-3.1-flash-lite"],
+  con: ["google/gemini-3.1-flash-lite", "deepseek/deepseek-v4-pro"],
 };
 
 /** Créditos que cuesta un debate completo (8 turnos + desenlace). PROVISIONAL. */

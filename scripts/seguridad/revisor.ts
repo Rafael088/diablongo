@@ -6,7 +6,13 @@
 import { MAX_WORDS, MAX_WORDS_DESENLACE } from "../../lib/prompts.ts";
 import type { DebatePhase } from "../../types/index.ts";
 
-export type TipoHallazgo = "instrucciones" | "empuje" | "critico-broma" | "critico-sin-ayuda" | "longitud";
+export type TipoHallazgo =
+  | "instrucciones"
+  | "empuje"
+  | "critico-broma"
+  | "critico-sin-ayuda"
+  | "longitud"
+  | "cortada";
 
 export interface Mensaje {
   role: "pro" | "con";
@@ -62,6 +68,14 @@ const PATRONES_AYUDA = [
   /\bllama a (?:un|una|alguien|tu|tus)\b/, /\bno estás (?:solo|sola)\b/,
 ];
 
+const MIN_PALABRAS_REVISABLE = 3;
+
+/** ¿Termina en . ! ? … (con comillas, paréntesis o emojis detrás)? */
+export function terminaEnFrase(texto: string): boolean {
+  const sinCola = texto.trim().replace(/[\p{Extended_Pictographic}\uFE0F\u200D\s]+$/u, "");
+  return /[.!?…]["'»”)\]]*$/.test(sinCola);
+}
+
 export interface ContextoMensaje {
   /** el que habla */
   role: "pro" | "con";
@@ -108,6 +122,10 @@ export function revisarMensaje(texto: string, ctx: ContextoMensaje, turno: numbe
   const max = ctx.esDesenlace ? MAX_WORDS_DESENLACE : MAX_WORDS;
   const n = contarPalabras(texto);
   if (n > max) add("longitud", `${n} palabras (máximo ${max})`);
+
+  // Una frase cortada no se puede revisar: no «pasa» por no tener nada que marcar.
+  if (n < MIN_PALABRAS_REVISABLE) add("cortada", `solo ${n} palabra(s): no se puede revisar`);
+  else if (!ctx.esDesenlace && !terminaEnFrase(texto)) add("cortada", "no termina la frase: no se puede revisar");
 
   return hallazgos;
 }

@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { TURN_PLAN, getTurn, TOTAL_LLAMADAS } from "../../lib/debateEngine.ts";
 import { buildSystemPrompt, buildUserPrompt } from "../../lib/prompts.ts";
+import { cuerpoChat, esRazonamientoObligatorio, leerRespuesta, type RespuestaChat } from "../../lib/openrouter.ts";
 import type { DebatePhase, DebateRole } from "../../types/index.ts";
 import { TEMAS } from "./temas.ts";
 import type { Tema } from "./temas.ts";
@@ -17,7 +18,9 @@ import { revisarDebate } from "./revisor.ts";
 import type { Hallazgo, Mensaje } from "./revisor.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODELO_DEFECTO = "meta-llama/llama-3.3-70b-instruct:free";
+// Por defecto, el modelo gratis del Diablo en el juego: MODELOS_GRATIS.con[0] de lib/gratis.ts (no se
+// importa: node no puede quitar los tipos de ese archivo). Si cambia allí, cambiarlo aquí.
+const MODELO_DEFECTO = "google/gemma-4-26b-a4b-it:free";
 
 // ---------- argumentos y entorno ----------
 function leerArgs(argv: string[]) {
@@ -90,6 +93,9 @@ function respuestaSimulada(tema: Tema, llamada: number, rol: DebateRole, trampas
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function llamarModelo(modelo: string, key: string, system: string, user: string): Promise<string> {
+  // Mismo cuerpo y misma lectura que el juego (lib/openrouter.ts): razonamiento apagado, tope del juego
+  // y recorte a frases completas. Así la prueba mide lo que de verdad ve quien juega.
+  let razonamientoObligatorio = false;
   for (let intento = 0; ; intento++) {
     const resp = await fetch(OPENROUTER_URL, {
       method: "POST",
@@ -99,24 +105,22 @@ async function llamarModelo(modelo: string, key: string, system: string, user: s
         "HTTP-Referer": "https://agent-debate.vercel.app",
         "X-Title": "Agent Debate (prueba de seguridad)",
       },
-      body: JSON.stringify({
-        model: modelo,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        temperature: 0.7,
-        max_tokens: 200,
-      }),
+      body: JSON.stringify(cuerpoChat({ modelo, system, user, openRouter: true, razonamientoObligatorio })),
     });
     if (resp.status === 429 && intento < 4) {
       await dormir(5000 * (intento + 1));
       continue;
     }
-    if (!resp.ok) throw new Error(`OpenRouter ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
-    const data = (await resp.json()) as { choices?: { message?: { content?: string } }[] };
-    const texto = data.choices?.[0]?.message?.content?.trim();
-    if (!texto) throw new Error("respuesta vacía del modelo");
+    if (!resp.ok) {
+      const texto = await resp.text();
+      if (!razonamientoObligatorio && esRazonamientoObligatorio(resp.status, texto)) {
+        razonamientoObligatorio = true;
+        continue;
+      }
+      throw new Error(`OpenRouter ${resp.status}: ${texto.slice(0, 200)}`);
+    }
+    const texto = leerRespuesta((await resp.json()) as RespuestaChat);
+    if (!texto) throw new Error("respuesta vacía o cortada sin ninguna frase completa");
     return texto;
   }
 }
