@@ -388,7 +388,7 @@ export default function DebateArena({
               maxLength={MAX_INTERVENCION}
               className="caja-campo"
             />
-            <p className="text-xs opacity-60 text-right">
+            <p className="text-sm opacity-60 text-right">
               {interventionText.length}/{MAX_INTERVENCION}
             </p>
             <div className="caja-botones">

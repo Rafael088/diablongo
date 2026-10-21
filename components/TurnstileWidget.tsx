@@ -107,7 +107,7 @@ export default function TurnstileWidget({ sitekey, onToken }: TurnstileWidgetPro
 
   return (
     <div>
-      <p id="turnstile-ayuda" className="text-xs opacity-70 mb-2">
+      <p id="turnstile-ayuda" className="text-sm opacity-70 mb-2">
         Comprobación de seguridad de Cloudflare: confirma que eres una persona antes de empezar.
       </p>
       <div
@@ -118,7 +118,7 @@ export default function TurnstileWidget({ sitekey, onToken }: TurnstileWidgetPro
         className="min-h-[65px]"
       />
       {estado === "cargando" && (
-        <p className="text-xs opacity-70" role="status">
+        <p className="text-sm opacity-70" role="status">
           Cargando la comprobación de seguridad…
         </p>
       )}

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Press_Start_2P, Pixelify_Sans } from "next/font/google";
+import { Press_Start_2P, Atkinson_Hyperlegible_Next } from "next/font/google";
 import "./globals.css";
 
-// Títulos, botones cortos y nombres de personaje.
+// Solo títulos, logo y etiquetas muy cortas (nombres de personaje).
 const titulo = Press_Start_2P({
   variable: "--font-titulo",
   weight: "400",
@@ -10,8 +10,9 @@ const titulo = Press_Start_2P({
   display: "swap",
 });
 
-// Diálogos, historial y formularios.
-const dialogo = Pixelify_Sans({
+// Todo el texto largo: diálogos, historial, formularios, botones, notas.
+// Atkinson Hyperlegible Next: diseñada para distinguir letras parecidas, se lee bien a 16-20 px.
+const dialogo = Atkinson_Hyperlegible_Next({
   variable: "--font-dialogo",
   subsets: ["latin"],
   display: "swap",
