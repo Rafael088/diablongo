@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/debate/route";
-import { MODELOS_GRATIS, MENSAJE_GRATIS_NO_DISPONIBLE, PROVEEDOR_GRATIS } from "@/lib/gratis";
+import { MODELOS_GRATIS, MODELOS_PAGO_DEL_SERVIDOR, MENSAJE_GRATIS_NO_DISPONIBLE, PROVEEDOR_GRATIS } from "@/lib/gratis";
 import { providers } from "@/lib/providers";
 import { SECRETO_PRUEBA, conToken } from "./ayudaToken";
 
@@ -52,10 +52,12 @@ afterEach(() => {
 });
 
 describe("MODELOS_GRATIS", () => {
-  it("todos los IDs terminan en :free, sin duplicados y Ángel y Diablo empiezan distinto", () => {
+  it("cada ID es :free o un modelo de pago aprobado, sin duplicados y Ángel y Diablo empiezan distinto", () => {
     const todos = [...MODELOS_GRATIS.pro, ...MODELOS_GRATIS.con];
     expect(todos.length).toBeGreaterThanOrEqual(3);
-    for (const m of todos) expect(m.endsWith(":free"), m).toBe(true);
+    for (const m of todos) expect(m.endsWith(":free") || MODELOS_PAGO_DEL_SERVIDOR.includes(m), m).toBe(true);
+    // Cada personaje tiene al menos un :free de respaldo.
+    for (const rol of ["pro", "con"] as const) expect(MODELOS_GRATIS[rol].some((m) => m.endsWith(":free")), rol).toBe(true);
     expect(new Set(todos).size).toBe(todos.length);
     expect(MODELOS_GRATIS.pro[0]).not.toBe(MODELOS_GRATIS.con[0]);
   });
@@ -82,14 +84,12 @@ describe("POST /api/debate en modo gratis", () => {
     expect((await llamar(base)).status).toBe(200);
   });
 
-  it("el cliente no puede pedir un modelo de pago en modo gratis", async () => {
+  it("el cliente no elige el modelo en modo gratis: siempre el primero de la lista del servidor", async () => {
     const pago = providers.find((p) => p.id === "openrouter")!.models;
     for (const model of [...pago, "modelo-inventado", 42, { x: 1 }]) {
       fetchMock.mockClear();
       expect((await llamar({ ...base, model })).status).toBe(200);
-      const enviado = llamadaEnviada().cuerpo.model;
-      expect(enviado.endsWith(":free")).toBe(true);
-      expect(enviado).not.toBe(model);
+      expect(llamadaEnviada().cuerpo.model).toBe(MODELOS_GRATIS.pro[0]);
     }
   });
 
