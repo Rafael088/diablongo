@@ -28,6 +28,7 @@ const MENSAJE_RESPUESTA_CORTADA =
 import { MENSAJE_SIN_SECRETO, comprobarTurno, obtenerSecreto, verificarToken } from "@/lib/tokenDebate";
 import { obtenerRegistroTurnos, type RegistroTurnos } from "@/lib/registroTurnos";
 import { MENSAJE_TEMA_CRITICO, esTemaCritico } from "@/lib/temaCritico";
+import { INSTRUCCION_REHACER, conRevision, revisarFrase } from "@/lib/revisarFrase";
 import { TOTAL_TURNS } from "@/lib/debateEngine";
 import {
   AVISO_RESPALDO_CREDITOS,
@@ -134,57 +135,88 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const systemPrompt = buildSystemPrompt(role);
     const userPrompt = buildUserPrompt(topic, role, phase, history, intervention);
 
-    let content: string;
-    let aviso: string | undefined;
-
-    if (esCreditos) {
-      // Cualquier fallo en un debate pagado (también una key del servidor rota) es nuestro: si pasa
-      // en un turno del debate, se devuelve el crédito y el debate se cierra. El desenlace tiene
-      // plantilla local en el cliente, así que si falla solo se libera el turno, sin devolver.
-      const r = await conRespaldo(role, elegirModeloCreditos, provider.baseUrl!, apiKey, systemPrompt, userPrompt, {
-        anteTodo: true,
-        aviso: AVISO_RESPALDO_CREDITOS,
-      });
-      if (!r.ok) {
-        console.error("Debate con créditos sin respuesta:", r.ultimo instanceof Error ? r.ultimo.message : r.ultimo);
-        if (turno.indice >= TOTAL_TURNS) {
-          await registro.liberar(debateId, turno.indice);
-          return NextResponse.json({ error: MENSAJE_CREDITOS_NO_DISPONIBLE }, { status: 503 });
-        }
-        const devuelto = await anularYDevolver(registro, permiso.payload, turno.indice);
-        return NextResponse.json(
-          { error: devuelto ? MENSAJE_CREDITOS_DEVUELTOS : MENSAJE_CREDITOS_NO_DISPONIBLE, devuelto, terminado: true },
-          { status: 503 }
-        );
+    // Genera la frase con el proveedor del turno. No toca el registro ni los créditos: si falla, devuelve
+    // `fallar`, que hace esos efectos solo si es la primera frase del turno (no al pedir otra al revisor).
+    const generar = async (prompt: string): Promise<Generacion> => {
+      if (esCreditos) {
+        // Cualquier fallo en un debate pagado (también una key del servidor rota) es nuestro: si pasa
+        // en un turno del debate, se devuelve el crédito y el debate se cierra. El desenlace tiene
+        // plantilla local en el cliente, así que si falla solo se libera el turno, sin devolver.
+        const r = await conRespaldo(role, elegirModeloCreditos, provider.baseUrl!, apiKey, systemPrompt, prompt, {
+          anteTodo: true,
+          aviso: AVISO_RESPALDO_CREDITOS,
+        });
+        if (r.ok) return { ok: true, content: r.content, aviso: r.aviso };
+        return {
+          ok: false,
+          fallar: async () => {
+            console.error("Debate con créditos sin respuesta:", r.ultimo instanceof Error ? r.ultimo.message : r.ultimo);
+            if (turno.indice >= TOTAL_TURNS) {
+              await registro.liberar(debateId, turno.indice);
+              return NextResponse.json({ error: MENSAJE_CREDITOS_NO_DISPONIBLE }, { status: 503 });
+            }
+            const devuelto = await anularYDevolver(registro, permiso.payload, turno.indice);
+            return NextResponse.json(
+              { error: devuelto ? MENSAJE_CREDITOS_DEVUELTOS : MENSAJE_CREDITOS_NO_DISPONIBLE, devuelto, terminado: true },
+              { status: 503 }
+            );
+          },
+        };
       }
-      content = r.content;
-      aviso = r.aviso;
-    } else {
       try {
         if (providerId === "gemini") {
-          content = await callGemini(model, apiKey, systemPrompt, userPrompt);
-        } else if (providerId === PROVEEDOR_GRATIS) {
+          return { ok: true, content: await callGemini(model, apiKey, systemPrompt, prompt) };
+        }
+        if (providerId === PROVEEDOR_GRATIS) {
           // Respaldo en el servidor: si el modelo da 429 o se cae, se prueba el siguiente de la lista.
           // Es el mismo turno (mismo índice, mismo token): no gasta otra llamada del límite diario.
-          const r = await conRespaldo(role, elegirModeloGratis, provider.baseUrl!, apiKey, systemPrompt, userPrompt, {
+          const r = await conRespaldo(role, elegirModeloGratis, provider.baseUrl!, apiKey, systemPrompt, prompt, {
             anteTodo: false,
             aviso: AVISO_RESPALDO_GRATIS,
           });
-          if (!r.ok) {
-            console.error("Todos los modelos gratis fallaron:", r.ultimo);
-            await registro.liberar(debateId, turno.indice);
-            return NextResponse.json({ error: MENSAJE_GRATIS_AGOTADO }, { status: 503 });
-          }
-          content = r.content;
-          aviso = r.aviso;
-        } else {
-          content = await callOpenAICompatible(provider.baseUrl!, model, apiKey, systemPrompt, userPrompt);
+          if (r.ok) return { ok: true, content: r.content, aviso: r.aviso };
+          return {
+            ok: false,
+            fallar: async () => {
+              console.error("Todos los modelos gratis fallaron:", r.ultimo);
+              await registro.liberar(debateId, turno.indice);
+              return NextResponse.json({ error: MENSAJE_GRATIS_AGOTADO }, { status: 503 });
+            },
+          };
         }
+        return { ok: true, content: await callOpenAICompatible(provider.baseUrl!, model, apiKey, systemPrompt, prompt) };
       } catch (error) {
-        // Sin respuesta del proveedor: el turno se devuelve para poder reintentarlo.
-        await registro.liberar(debateId, turno.indice);
-        throw error;
+        return {
+          ok: false,
+          fallar: async () => {
+            // Sin respuesta del proveedor: el turno se devuelve para poder reintentarlo.
+            await registro.liberar(debateId, turno.indice);
+            throw error;
+          },
+        };
       }
+    };
+
+    const primera = await generar(userPrompt);
+    if (!primera.ok) return await primera.fallar();
+    let content = primera.content;
+    const aviso = primera.aviso;
+
+    // Segunda barrera: cada frase del Diablo pasa por el revisor antes de mostrarse (lib/revisarFrase.ts).
+    if (role === "con") {
+      const keyRevisor = process.env.OPENROUTER_API_KEY;
+      const revision = await conRevision({
+        frase: content,
+        revisar: (frase) => revisarFrase(frase, topic, keyRevisor),
+        rehacer: async () => {
+          const otra = await generar(userPrompt + INSTRUCCION_REHACER);
+          return otra.ok ? otra.content : null;
+        },
+        esDesenlace: phase === "desenlace",
+        indice: turno.indice,
+      });
+      if (revision.cambio !== "ninguno") console.warn(`Frase del Diablo ${revision.cambio} por el revisor (turno ${turno.indice}).`);
+      content = revision.texto;
     }
 
     const response: TurnResponse = aviso ? { content, aviso } : { content };
@@ -195,6 +227,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+type Generacion =
+  | { ok: true; content: string; aviso?: string }
+  | { ok: false; fallar: () => Promise<NextResponse> };
 
 type ResultadoRespaldo = { ok: true; content: string; aviso?: string } | { ok: false; ultimo: unknown };
 
