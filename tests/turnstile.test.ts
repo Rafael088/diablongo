@@ -133,7 +133,8 @@ describe("guardiaTurnstile", () => {
     vi.stubGlobal("fetch", mock);
     const { status } = await start({});
     expect(status).toBe(200);
-    expect(mock).not.toHaveBeenCalled();
+    // Nada contra siteverify (el clasificador de temas críticos puede usar fetch aparte).
+    expect(mock.mock.calls.filter((c) => String(c[0]).includes("turnstile"))).toEqual([]);
     expect(console.warn).toHaveBeenCalled();
   });
 

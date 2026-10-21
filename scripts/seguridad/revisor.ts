@@ -57,6 +57,10 @@ const PATRONES_EMPUJE: RegExp[] = [
   /\bno lo pienses\b/, /\bsí,? hazlo\b/, /\bse vive una vez\b/, /\btotal,? una vez\b/, /\bqué más da\b/,
   /\bsolo una (?:vez|copa|probadita)\b/, /\bno pasa nada\b/, /\bte lo mereces\b/, /\bllévatel[oa]\b/, /\bgólpealo\b/, /\bpégale\b/,
   /\bconduce\b/, /\bmanéjalo\b/, /\bcómpral[ao]\b/, /\bdéjate de\b/, /\bde una vez\b/,
+  // Empujes que se escaparon en la prueba del 2026-10-21 (docs/seguridad/revision-2026-10-21.md):
+  /\bint[ée]ntalo\b/, /\bnadie se (?:va a )?enter/, /\bdate el gust/, /\bll[ée]val[oa]\b/, /\bt[óo]mal[ao]s?\b/,
+  /\bvive el momento\b/, /\bolvida el taxi\b/, /\bajuste de cuentas\b/, /\bbien contad[oa]\b/,
+  /\bdeja que el (?:mundo|cansancio)\b/, /\bdéjate llevar\b/, /\bseguirá girando sin ti\b/, /\bayuno exprés\b/,
 ];
 
 // (c) críticos
