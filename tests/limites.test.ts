@@ -1,6 +1,9 @@
 // Pruebas del límite diario del modo gratis, el cupo global y el registro de turnos en Redis (almacén simulado).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+
+// connection() solo existe dentro de una petición real de Next; aquí la ruta se llama directo.
+vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), connection: async () => {} }));
 import { POST as START } from "@/app/api/debate/start/route";
 import { GET as CUPO } from "@/app/api/debate/cupo/route";
 import { AlmacenMemoria, usarAlmacen } from "@/lib/almacen";

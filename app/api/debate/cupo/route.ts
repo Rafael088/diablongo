@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import { consultarCupo } from "@/lib/limites";
 
 const SIN_CACHE = { "Cache-Control": "no-store" };
 
 /** GET /api/debate/cupo: debates gratis que le quedan hoy a esta IP y cuándo se reinicia. No consume. */
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  // Solo en cada visita: sin esto el build intenta prerenderizarla y llega a tocar Upstash.
+  await connection();
   try {
     const r = await consultarCupo(request);
     if (!r.ok && r.motivo === "sin-almacen") {
