@@ -165,6 +165,7 @@ input[type="range"]::-webkit-slider-thumb {
 .caja-boton:focus-visible, .caja-campo:focus-visible { outline: 3px solid var(--color-acento); outline-offset: 2px; }
 .tarjeta { margin: 18px auto 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .tarjeta-canvas { width: min(100%, 360px); height: auto; aspect-ratio: 1080 / 1350; image-rendering: pixelated; }
+.tarjeta-error { max-width: 360px; margin: 0; text-align: center; color: var(--color-diablo); }
 .tarjeta-botones { flex-wrap: wrap; justify-content: center; }
 
 /* Marcador de Ángel vs Diablo */
