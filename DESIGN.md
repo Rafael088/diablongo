@@ -63,10 +63,14 @@ Cargadas con `next/font/google` en `app/layout.tsx` (`display: "swap"`, subconju
 
 | Fuente | Variable CSS | Uso |
 | --- | --- | --- |
-| Press Start 2P | `--font-titulo` | Títulos, botones cortos, nombres de personaje, «GANÓ EL DIABLO». Muy ancha: úsala pequeña (0.6 a 0.85 rem; 22 a 38 px en la tarjeta) |
-| Pixelify Sans | `--font-dialogo` | Texto de la caja de diálogo, historial, formularios, tema en la tarjeta (1 a 1.15 rem) |
+| Press Start 2P | `--font-titulo` | Solo títulos (h1 a h4), logo, nombres de personaje, «GANÓ EL DIABLO» y el marcador. Muy ancha e ilegible en párrafos: 0.75 a 0.85 rem en la pantalla, 22 a 38 px en la tarjeta. Ya no se usa en botones |
+| Atkinson Hyperlegible Next | `--font-dialogo` | Todo el texto largo: caja de diálogo, historial, formularios, notas, avisos, panel de cuenta y todos los botones (700 en botones y nombres de modo) |
 
-Glifos verificados en los archivos woff2 del subconjunto `latin` que sirve Google: ambas fuentes traen á é í ó ú ñ ü Á É Í Ó Ú Ñ ¿ ¡ « » — … “ ” y *. Si en el futuro falta alguno, el fallback es `ui-monospace, monospace` (queda declarado después de la variable en cada `font-family`). Un detalle: en Press Start 2P las mayúsculas con tilde (Ó en «GANÓ») ocupan la cuadrícula de 8×8 y el acento queda muy pegado; se lee, pero evita frases largas en mayúsculas con tilde.
+Por qué Atkinson Hyperlegible Next: la hizo el Braille Institute para distinguir letras parecidas (I/l/1, O/0); es la más legible de las candidatas a 16-20 px y, por ser plana y de trazo firme, combina con el marco pixel sin fatigar. Pixelify Sans se descartó por ilegible en párrafos.
+
+Tamaños mínimos: diálogo de la arena 1.2 rem (19 px) en móvil y 1.35 rem desde 768 px, interlineado 1.5; formularios, historial y notas 1 rem (16 px); texto informativo nunca bajo 0.9 rem (14 px, `text-sm`); cuerpo 1.0625 rem. La tarjeta PNG sigue leyendo `--font-dialogo` para el tema y espera con `document.fonts.load()` a la fuente correcta (no cambió el código).
+
+Glifos: Atkinson Hyperlegible Next trae el subconjunto `latin` (á é í ó ú ñ ü ¿ ¡ « » — … “ ”). Press Start 2P: las mayúsculas con tilde (Ó en «GANÓ») quedan pegadas al acento; evita frases largas en mayúsculas con tilde. Fallback: `system-ui, sans-serif` para el diálogo y `ui-monospace, monospace` para los títulos.
 
 ## Colores
 

@@ -237,7 +237,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
               maxLength={MAX_TEMA}
               className="config-campo h-24 resize-none"
             />
-            <p className="text-xs opacity-60 text-right mt-1" aria-live="off">
+            <p className="text-sm opacity-60 text-right mt-1" aria-live="off">
               {topic.length}/{MAX_TEMA}
             </p>
           </div>
@@ -433,11 +433,11 @@ function DebaterForm({
             />
             Recordar en este dispositivo
           </label>
-          <p className="text-xs opacity-70 mt-1">{AVISO_RECORDAR}</p>
+          <p className="text-sm opacity-70 mt-1">{AVISO_RECORDAR}</p>
           <button
             type="button"
             onClick={onDesconectar}
-            className="text-xs underline opacity-70 mt-2"
+            className="text-sm underline opacity-70 mt-2"
           >
             Desconectar
           </button>
