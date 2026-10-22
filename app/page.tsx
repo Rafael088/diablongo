@@ -4,7 +4,6 @@ import { useState } from "react";
 import { DebateConfig } from "@/types";
 import ConfigPanel from "@/components/ConfigPanel";
 import DebateArena from "@/components/DebateArena";
-import Cuenta from "@/components/Cuenta";
 import PantallaAyuda from "@/components/PantallaAyuda";
 import { categoriaCritica } from "@/lib/temaCritico";
 
@@ -16,7 +15,7 @@ export default function Home() {
   const [ayuda, setAyuda] = useState(false);
 
   return (
-    <main className="min-h-screen py-8 px-4">
+    <main className="min-h-screen py-6 px-4">
       {ayuda ? (
         <PantallaAyuda onVolver={() => setAyuda(false)} />
       ) : config ? (
@@ -29,9 +28,7 @@ export default function Home() {
           }}
         />
       ) : (
-        <>
-          <Cuenta />
-          <ConfigPanel
+        <ConfigPanel
             onStart={(nueva, token) => {
               if (categoriaCritica(nueva.topic)) {
                 setAyuda(true);
@@ -41,7 +38,6 @@ export default function Home() {
               setConfig(nueva);
             }}
           />
-        </>
       )}
     </main>
   );
