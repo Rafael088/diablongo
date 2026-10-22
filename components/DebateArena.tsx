@@ -1,5 +1,6 @@
 "use client";
 
+import PixelSprite from "@/components/PixelSprite";
 import PantallaAyuda from "./PantallaAyuda";
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
@@ -46,6 +47,12 @@ interface DebateArenaProps {
   /** Capturas: la tarjeta escribe su PNG real en la página. */
   volcadoTarjeta?: boolean;
 }
+
+// Botones finales con las frases del ejemplo de interfaz del tablero de marca.
+const ELECCION: Record<"pro" | "con", { titulo: string; detalle: string }> = {
+  pro: { titulo: "Escucha al angelito", detalle: "(Es la decisión inteligente)" },
+  con: { titulo: "Dale al diablongo", detalle: "(La vida es corta)" },
+};
 
 const NOMBRES: Record<DebateRole | "user", string> = {
   pro: "Ángel",
@@ -317,11 +324,11 @@ export default function DebateArena({
             {!eleccion ? (
               <>
                 <p className="caja-pregunta">* ¿A quién le haces caso?</p>
-                <div className="caja-botones">
+                <div className="eleccion-botones">
                   {(["pro", "con"] as const).map((quien) => (
                     <button
                       key={quien}
-                      className={`caja-boton${ganando === quien ? " caja-boton-sugerido" : ""}`}
+                      className={`eleccion-boton eleccion-${quien}${ganando === quien ? " caja-boton-sugerido" : ""}`}
                       onClick={() => elegir(quien)}
                       aria-label={
                         ganando === quien
@@ -329,7 +336,14 @@ export default function DebateArena({
                           : `Hacer caso al ${NOMBRES[quien]}`
                       }
                     >
-                      {quien === "pro" ? "😇 Al Ángel" : "😈 Al Diablo"}
+                      <span aria-hidden>
+                        <PixelSprite personaje={quien} fotograma="victoria" escala={1.5} />
+                      </span>
+                      <span>
+                        <span className="eleccion-titulo">{ELECCION[quien].titulo}</span>
+                        <span className="eleccion-detalle">{ELECCION[quien].detalle}</span>
+                        {ganando === quien && <span className="eleccion-sugerido">Iba ganando en la barra</span>}
+                      </span>
                     </button>
                   ))}
                 </div>

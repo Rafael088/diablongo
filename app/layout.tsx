@@ -19,8 +19,8 @@ const dialogo = Atkinson_Hyperlegible_Next({
 });
 
 export const metadata: Metadata = {
-  title: "Agent Debate",
-  description: "Pon a dos IAs a debatir cualquier tema",
+  title: "Diablongo",
+  description: "Tu cabeza es un campo de batalla: el angelito y el diablongo se pelean tu decisión.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

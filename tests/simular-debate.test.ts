@@ -86,6 +86,6 @@ it("simula un debate completo sin llamar a ningún modelo", () => {
     if (!plantilla.includes(quien === "pro" ? "Angelito" : "Diablito")) fallar(`plantilla de ${nom} no nombra al elegido`);
   }
   if (contarPalabras(limpiarDesenlace("uno ".repeat(40))) > MAX_WORDS_DESENLACE) fallar("limpiarDesenlace no recorta a 20 palabras");
-  if (nombreArchivoTarjeta("¿Me compro unos rines de 17?/\\..") !== "agent-debate-me-compro-unos-rines-de-17.png") fallar(`nombre de archivo mal saneado: ${nombreArchivoTarjeta("¿Me compro unos rines de 17?/\\..")}`);
+  if (nombreArchivoTarjeta("¿Me compro unos rines de 17?/\\..") !== "diablongo-me-compro-unos-rines-de-17.png") fallar(`nombre de archivo mal saneado: ${nombreArchivoTarjeta("¿Me compro unos rines de 17?/\\..")}`);
   expect(errores).toEqual([]);
 });

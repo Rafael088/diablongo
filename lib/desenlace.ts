@@ -3,7 +3,7 @@
 import { MAX_WORDS_DESENLACE } from "./prompts.ts";
 
 /** Nombre de marca provisional de la tarjeta; se decide en otra tarea. */
-export const MARCA_TARJETA = "Agent Debate";
+export const MARCA_TARJETA = "Diablongo";
 
 /** Si el modelo tarda más que esto se usa la plantilla local. */
 export const TIEMPO_MAX_DESENLACE_MS = 8000;

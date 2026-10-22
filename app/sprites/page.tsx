@@ -7,7 +7,7 @@ import {
 } from "@/lib/sprites";
 
 export const metadata: Metadata = {
-  title: "Sprites · Agent Debate",
+  title: "Sprites · Diablongo",
 };
 
 const PERSONAJES: PersonajeSprite[] = ["pro", "con", "usuario"];

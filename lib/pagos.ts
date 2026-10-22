@@ -34,7 +34,7 @@ export function cuerpoPreferencia(opts: {
     items: [
       {
         id: paquete.id,
-        title: `Agent Debate: ${paquete.creditos} créditos (${paquete.nombre})`,
+        title: `Diablongo: ${paquete.creditos} créditos (${paquete.nombre})`,
         quantity: 1,
         currency_id: "COP",
         unit_price: paquete.precioCop,
