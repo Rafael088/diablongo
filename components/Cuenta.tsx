@@ -95,7 +95,8 @@ export default function Cuenta() {
   };
 
   return (
-    <section className="w-full max-w-4xl mx-auto px-6 mb-4" aria-label="Tu cuenta">
+    <section className="ajustes-cuenta" aria-labelledby="cuenta-titulo">
+      <h3 id="cuenta-titulo" className="ajustes-seccion">Tu cuenta</h3>
       <div className="config-aviso flex flex-wrap items-center justify-between gap-3">
         {estado.usuario ? (
           <>

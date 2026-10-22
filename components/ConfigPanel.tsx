@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { proveedoresDisponibles, getProviderById } from "@/lib/providers";
 import { DebateConfig, DebaterConfig, ProviderConfig } from "@/types";
@@ -23,6 +24,8 @@ import {
   textoContador,
 } from "@/lib/modoConfig";
 import TurnstileWidget from "./TurnstileWidget";
+import PanelAjustes from "./PanelAjustes";
+import Cuenta from "./Cuenta";
 import { configSupabase } from "@/lib/supabase/config";
 import { CREDITOS_POR_DEBATE } from "@/lib/creditosDebate";
 import { textoCreditos } from "@/lib/cuenta";
@@ -210,65 +213,110 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
     onStart({ topic: topic.trim(), pro, con }, tokenTurnstile ?? undefined);
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-4xl mx-auto p-6"
-    >
-      <div className="config-caja">
-        <div className="marca-cabecera">
-          <span className="marca-sprite" aria-hidden>
-            <PixelSprite personaje="pro" escala={2} />
-          </span>
-          <Logo lema />
-          <span className="marca-sprite" aria-hidden>
-            <PixelSprite personaje="con" escala={2} />
-          </span>
-        </div>
+  // Ajustes: se abre solo al volver de OpenRouter o de un login fallido, para ver el resultado.
+  const [ajustes, setAjustes] = useState(
+    () => vieneDeOpenRouter() || (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("cuenta") === "error")
+  );
+  const cerrarAjustes = useCallback(() => setAjustes(false), []);
+  const abrirAjustes = () => setAjustes(true);
 
-        <div className="space-y-6">
-          <div>
-            <label className="config-etiqueta">
+  return (
+    <>
+      <div className="inicio" inert={ajustes}>
+        <header className="inicio-barra">
+          <button type="button" className="inicio-ajustes" onClick={abrirAjustes} aria-haspopup="dialog">
+            <Settings2 className="w-5 h-5" aria-hidden />
+            Ajustes
+          </button>
+        </header>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="inicio-columna"
+        >
+          <div className="marca-cabecera">
+            <span className="marca-sprite" aria-hidden>
+              <PixelSprite personaje="pro" escala={2} />
+            </span>
+            <Logo lema />
+            <span className="marca-sprite" aria-hidden>
+              <PixelSprite personaje="con" escala={2} />
+            </span>
+          </div>
+
+          <div className="inicio-dilema">
+            <label htmlFor="dilema" className="inicio-etiqueta">
               ¿Qué dilema tienes?
             </label>
             <textarea
+              id="dilema"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="¿Le cambio los rines de 15 a 17 a mi carro?"
               maxLength={MAX_TEMA}
-              className="config-campo h-24 resize-none"
+              rows={3}
+              className="inicio-campo"
             />
-            <p className="text-sm opacity-60 text-right mt-1" aria-live="off">
+            <p className="inicio-cuenta" aria-live="off">
               {topic.length}/{MAX_TEMA}
             </p>
           </div>
 
-          <SelectorModo modo={modo} onChange={setModo} />
+          <EstadoModo
+            modo={modo}
+            contador={contador}
+            conectado={conectado}
+            proveedor={getProviderById(proProvider)?.name ?? proProvider}
+            onCambiar={abrirAjustes}
+          />
 
-          {modo === "gratis" && <ContadorGratis estado={contador} />}
-
-          {modo === "creditos" && (
-            <p className="config-aviso" role="status">
-              Ángel y Diablo juegan con modelos de pago. Cada debate cuesta {textoCreditos(CREDITOS_POR_DEBATE)} de
-              tu cuenta; si los modelos fallan antes de terminar, te lo devolvemos. Entra a tu cuenta arriba.
-            </p>
+          {SITEKEY_TURNSTILE ? (
+            <TurnstileWidget sitekey={SITEKEY_TURNSTILE} onToken={setTokenTurnstile} />
+          ) : (
+            !OMITIR_TURNSTILE && (
+              <p role="alert" className="inicio-alerta">
+                El servidor no está bien configurado: falta la comprobación de seguridad.
+              </p>
+            )
           )}
 
-          {modo === "openrouter" && (
-            <ConexionOpenRouter
-              conectado={conectado}
-              estado={conexion.estado}
-              mensaje={conexion.mensaje}
-              onConectar={conectar}
-              onDesconectar={() => desconectar(PROVEEDOR_OAUTH)}
-            />
-          )}
+          <button onClick={handleStart} disabled={!puedeEmpezar} className="config-iniciar">
+            Iniciar Debate
+          </button>
 
-          {(modo === "key" || (modo === "openrouter" && conectado)) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <p className="inicio-legal">
+            Es un juego: lo que digan el Ángel y el Diablo lo inventa una IA y no es un consejo. Tú decides y
+            respondes por lo que hagas. Al jugar aceptas los <Link href="/terminos">términos y condiciones</Link>.
+          </p>
+        </motion.div>
+      </div>
+
+      <PanelAjustes abierto={ajustes} onCerrar={cerrarAjustes}>
+        <SelectorModo modo={modo} onChange={setModo} />
+
+        {modo === "creditos" && (
+          <p className="config-aviso" role="status">
+            Ángel y Diablo juegan con modelos de pago. Cada debate cuesta {textoCreditos(CREDITOS_POR_DEBATE)} de tu
+            cuenta; si los modelos fallan antes de terminar, te lo devolvemos. Entra a tu cuenta aquí abajo.
+          </p>
+        )}
+
+        {modo === "openrouter" && (
+          <ConexionOpenRouter
+            conectado={conectado}
+            estado={conexion.estado}
+            mensaje={conexion.mensaje}
+            onConectar={conectar}
+            onDesconectar={() => desconectar(PROVEEDOR_OAUTH)}
+          />
+        )}
+
+        {(modo === "key" || (modo === "openrouter" && conectado)) && (
+          <>
             <DebaterForm
-              title="Defensor (PRO)"
+              title="Modelo del Ángel"
               color="pro"
               provider={proProv0}
               soloModelo={enOpenRouter}
@@ -282,7 +330,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
               onDesconectar={() => desconectar(proProv0)}
             />
             <DebaterForm
-              title="Opositor (CON)"
+              title="Modelo del Diablo"
               color="con"
               provider={conProv0}
               soloModelo={enOpenRouter}
@@ -295,39 +343,56 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
               onRecordarChange={(v) => cambiarRecordar(conProv0, v)}
               onDesconectar={() => desconectar(conProv0)}
             />
-          </div>
-          )}
+          </>
+        )}
 
-          {SITEKEY_TURNSTILE ? (
-            <TurnstileWidget sitekey={SITEKEY_TURNSTILE} onToken={setTokenTurnstile} />
-          ) : (
-            !OMITIR_TURNSTILE && (
-              <p role="alert" className="text-sm">
-                El servidor no está bien configurado: falta la comprobación de seguridad.
-              </p>
-            )
-          )}
+        <p className="config-nota">
+          {modo === "openrouter"
+            ? "La key que te da OpenRouter se guarda solo en esta pestaña y se borra al cerrarla. Nunca se envía a ningún servidor propio."
+            : modo === "creditos"
+            ? "No necesitas key: el servidor pone los modelos y descuenta los créditos al empezar."
+            : modo === "key"
+            ? "Tu API key se guarda solo en esta pestaña y se borra al cerrarla, salvo que marques «Recordar en este dispositivo». Nunca se envía a ningún servidor propio."
+            : "Sin key no guardamos nada tuyo: el servidor pone el modelo y el límite es por día."}
+        </p>
 
-          <button
-            onClick={handleStart}
-            disabled={!puedeEmpezar}
-            className="config-iniciar"
-          >
-            Iniciar Debate
-          </button>
+        <Cuenta />
 
-          <p className="config-nota">
-            {modo === "openrouter"
-              ? "La key que te da OpenRouter se guarda solo en esta pestaña y se borra al cerrarla. Nunca se envía a ningún servidor propio."
-              : modo === "creditos"
-              ? "No necesitas key: el servidor pone los modelos y descuenta los créditos al empezar."
-              : modo === "key"
-              ? "Tu API key se guarda solo en esta pestaña y se borra al cerrarla, salvo que marques «Recordar en este dispositivo». Nunca se envía a ningún servidor propio."
-              : "Sin key no guardamos nada tuyo: el servidor pone el modelo y el límite es por día."}
-          </p>
-        </div>
-      </div>
-    </motion.div>
+        <p className="ajustes-legal">
+          <Link href="/terminos">Términos y condiciones</Link>
+        </p>
+      </PanelAjustes>
+    </>
+  );
+}
+
+/** Una línea bajo el dilema que dice cómo vas a jugar; «Cambiar» abre Ajustes. */
+function EstadoModo(props: {
+  modo: ModoConfig;
+  contador: EstadoContador;
+  conectado: boolean;
+  proveedor: string;
+  onCambiar: () => void;
+}) {
+  const { modo, contador, conectado, proveedor, onCambiar } = props;
+  const alerta = (modo === "gratis" && contador.tipo === "agotado") || (modo === "openrouter" && !conectado);
+  const texto =
+    modo === "gratis"
+      ? textoContador(contador)
+      : modo === "openrouter"
+      ? conectado
+        ? "Juegas con tu cuenta de OpenRouter."
+        : "Falta conectar tu cuenta de OpenRouter."
+      : modo === "key"
+      ? `Juegas con tu propia key (${proveedor}).`
+      : `Juegas con créditos: ${textoCreditos(CREDITOS_POR_DEBATE)} por debate.`;
+  return (
+    <p className={`inicio-estado${alerta ? " inicio-estado-alerta" : ""}`} role="status" aria-live="polite">
+      <span>{texto}</span>
+      <button type="button" className="inicio-cambiar" onClick={onCambiar}>
+        {alerta && modo === "openrouter" ? "Conectar" : "Cambiar"}
+      </button>
+    </p>
   );
 }
 
@@ -459,11 +524,11 @@ const OPCIONES_MODO: { id: ModoConfig; titulo: string; detalle: string }[] = [
 function SelectorModo({ modo, onChange }: { modo: ModoConfig; onChange: (m: ModoConfig) => void }) {
   return (
     <div>
-      <span id="modo-etiqueta" className="config-etiqueta">¿Cómo quieres jugar?</span>
+      <h3 id="modo-etiqueta" className="ajustes-seccion">¿Cómo quieres jugar?</h3>
       <div
         role="radiogroup"
         aria-labelledby="modo-etiqueta"
-        className={`grid grid-cols-1 gap-3 ${HAY_CUENTAS ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"}`}
+        className="grid grid-cols-1 gap-2"
       >
         {OPCIONES_MODO.filter((o) => o.id !== "creditos" || HAY_CUENTAS).map((o) => (
           <button
@@ -480,15 +545,6 @@ function SelectorModo({ modo, onChange }: { modo: ModoConfig; onChange: (m: Modo
         ))}
       </div>
     </div>
-  );
-}
-
-function ContadorGratis({ estado }: { estado: EstadoContador }) {
-  const agotado = estado.tipo === "agotado";
-  return (
-    <p className={`config-aviso${agotado ? " config-aviso-alerta" : ""}`} role="status" aria-live="polite">
-      {textoContador(estado)}
-    </p>
   );
 }
 

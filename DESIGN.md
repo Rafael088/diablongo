@@ -2,6 +2,10 @@
 
 Marca: **Diablongo**, «Tu cabeza es un campo de batalla». Antes se llamaba Agent Debate. Juego en pixel art, estilo Undertale: un Ángel y un Diablo se pelean tu decisión en frases cortas y al final eliges a quién le haces caso. Sin API keys del usuario en el modo gratis. Este documento reemplaza al diseño del debate formal PRO/CON (v0.2). Planning de referencia: `Agent Debate - Planning v0.3`.
 
+## Términos y condiciones
+
+`/terminos` (`app/terminos/page.tsx`), modo lectura: resumen en una caja y 11 secciones (qué es, no es consejo profesional, tus decisiones son tuyas, contenido de IA, uso permitido, modos y terceros, créditos y pagos, datos, propiedad intelectual, cambios, contacto y ley colombiana). La fecha y el canal de contacto viven en `lib/legal.ts`. Capturas: `docs/inicio-sencillo.png`, `docs/inicio-movil.png`, `docs/ajustes.png`, `docs/terminos.png`.
+
 ## Personajes y tono
 
 | Personaje | Rol interno | Qué es | Tono |
@@ -14,17 +18,18 @@ Cada turno son 1 o 2 frases (unas 35 palabras) y refuta lo último que dijo el o
 
 ## Flujo de pantallas
 
-1. **Panel de cuenta** (`Cuenta`, arriba): si Supabase está configurado, muestra «Entrar» o el correo + créditos + «Comprar» / «Salir»; sin Supabase no aparece.
-2. **Configuración** (`/`, `ConfigPanel`): 
-   - Textarea: tema o propuesta (máx. 200 caracteres, `MAX_TEMA`).
-   - **Selector de modo** (radio buttons):
-     - **Gratis**: sin key, contador diario.
-     - **Conectar OpenRouter**: botón de conexión OAuth PKCE.
-     - **Mi key**: selector de proveedor (OpenRouter, Gemini, Groq, Ollama), modelo y API key por proveedor; checkbox «Recordar en este dispositivo»; botón de desconectar.
-     - **Con créditos**: solo si hay cuentas; aviso de costo (1 crédito por debate, devolución si fallan).
-   - Selector de proveedor y modelo para Ángel (PRO) y Diablo (CON) en «Mi key» o «OpenRouter» conectado.
+1. **Inicio** (`/`, `ConfigPanel`): una sola columna centrada con lo mínimo para jugar.
+   - Logo entre el Ángel y el Diablo.
+   - «¿Qué dilema tienes?»: textarea (máx. 200 caracteres, `MAX_TEMA`).
+   - Una línea de estado (`EstadoModo`) que dice cómo vas a jugar: en Gratis, cuántos debates te quedan hoy; en los otros modos, con qué juegas. «Cambiar» abre Ajustes (en rojo claro y «Conectar» si falta algo).
    - **Cloudflare Turnstile** (si está configurado).
-   - Botón «Iniciar Debate» (habilitado si tema no está vacío, Turnstile pasó, modelos estan listos según el modo).
+   - Botón «Iniciar Debate» (habilitado si el tema no está vacío, Turnstile pasó y el modo está listo; `puedeIniciar`).
+   - Aviso legal corto: es un juego, la IA no aconseja, tú decides; enlace a `/terminos`.
+2. **Ajustes** (`PanelAjustes`, botón arriba a la derecha): panel lateral que entra desde la derecha, con foco atrapado, Esc y el fondo para cerrar, y el inicio `inert` detrás. Se abre solo al volver de OpenRouter (`?code=`) o de un login fallido (`?cuenta=error`). Lleva:
+   - **Selector de modo**: Gratis, Conectar OpenRouter, Mi key y Con créditos (solo si hay cuentas).
+   - Lo propio de cada modo: conexión OAuth, modelo y key del Ángel y del Diablo (en columna), aviso de créditos, nota de privacidad.
+   - **Tu cuenta** (`Cuenta`): entrar con Google o enlace al correo, créditos, comprar, salir. Sin Supabase no aparece.
+   - Enlace a los términos.
 3. **Arena** (`DebateArena`): 8 turnos (apertura, 3 cruces, última palabra) con caja de diálogo letra por letra. Tras el turno 4 la persona puede intervenir (no es una llamada extra) o seguir. Cada frase se puede marcar con un pulgar y mueve la barra de tentación.
 4. **Elección**: «¿A quién le haces caso?»; la barra sugiere (borde azul) al que va ganando.
 5. **Tarjeta** (`TarjetaDesenlace`): PNG de 1080×1350 con la decisión, el sprite ganador y un desenlace de 20 palabras; descargar, compartir o jugar otra vez.
