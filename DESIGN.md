@@ -1,6 +1,6 @@
-# Agent Debate — Diseño (Ángel contra Diablo)
+# Diablongo — Diseño
 
-Juego en pixel art, estilo Undertale: un Ángel y un Diablo se pelean tu decisión en frases cortas y al final eliges a quién le haces caso. Sin API keys del usuario en el modo gratis. Este documento reemplaza al diseño del debate formal PRO/CON (v0.2). Planning de referencia: `Agent Debate - Planning v0.3`.
+Marca: **Diablongo**, «Tu cabeza es un campo de batalla». Antes se llamaba Agent Debate. Juego en pixel art, estilo Undertale: un Ángel y un Diablo se pelean tu decisión en frases cortas y al final eliges a quién le haces caso. Sin API keys del usuario en el modo gratis. Este documento reemplaza al diseño del debate formal PRO/CON (v0.2). Planning de referencia: `Agent Debate - Planning v0.3`.
 
 ## Personajes y tono
 
@@ -72,34 +72,62 @@ Tamaños mínimos: diálogo de la arena 1.2 rem (19 px) en móvil y 1.35 rem des
 
 Glifos: Atkinson Hyperlegible Next trae el subconjunto `latin` (á é í ó ú ñ ü ¿ ¡ « » — … “ ”). Press Start 2P: las mayúsculas con tilde (Ó en «GANÓ») quedan pegadas al acento; evita frases largas en mayúsculas con tilde. Fallback: `system-ui, sans-serif` para el diálogo y `ui-monospace, monospace` para los títulos.
 
+## Marca
+
+Sale del tablero de marca pixel art de Diablongo. Los sprites de los personajes no cambiaron; lo que es de la marca es el logo, el ícono, la paleta y dos pantallas copiadas del «ejemplo de interfaz».
+
+- **Logo** (`components/Logo.tsx`): «DIABLONGO» en Press Start 2P con el degradado del tablero en escalones (crema → oro → rojo), contorno rojo duro, sombra noche y dos cuernos de píxel dibujados en código. Con `lema` añade «Tu cabeza es un campo de batalla». Va arriba de la configuración, entre el Ángel y el Diablo (los sprites se ocultan bajo 520 px para que quepa en el celular).
+- **Ícono y favicon** (`app/icon.svg`, `app/apple-icon.png`, `app/favicon.ico`): el sprite del Diablo sobre fondo noche con borde rojo, como el «ícono de app» del tablero. No se editan a mano: `node scripts/generar-iconos.ts` los vuelve a generar desde `lib/sprites`.
+- **Pantalla final**: dos botones grandes como en el tablero, «Escucha al angelito (Es la decisión inteligente)» con borde celeste y «Dale al diablongo (La vida es corta)» con borde rojo, cada uno con su sprite de victoria. El que iba ganando lleva un anillo oro y la nota «Iba ganando en la barra».
+- **Escenario**: suelo violeta en escalones bajo los personajes, como «sprites en acción».
+- **Botón principal** («Iniciar Debate»): rojo Diablongo con texto noche y, al pasar el ratón, oro.
+- **Nombre**: título de la pestaña, cabecera, tarjeta PNG («DIABLONGO» en rojo; archivo `diablongo-<tema>.png`), concepto de Mercado Pago y cabeceras hacia OpenRouter (`diablongo.vercel.app`). Las claves guardadas en el navegador (`agent-debate-key:*`, `agent-debate-config`) se quedan como estaban para no borrarle la key a nadie.
+
 ## Colores
 
-Una sola paleta en `:root` de `app/globals.css`. Sus valores viven también en `lib/paleta.ts` (`TOKENS`), derivados de `PALETA_SPRITES` (`lib/sprites/paleta.ts`) para que combinen con los sprites; solo `fondo`, `superficie`, `diablo` y `error` son valores propios (más oscuros o más claros que el sprite para que lean como fondo o como texto).
+Una sola paleta en `:root` de `app/globals.css`, con los ocho colores del tablero de marca: `#FF4D6D` (rojo Diablongo), `#D7263D` (rojo oscuro), `#F6E7C3` (crema), `#6A5ACD` (violeta), `#0F0E17` (noche), `#4B4862` (gris violeta), `#FFC857` (oro) y `#7ED6FF` (celeste). Tres valores son derivados porque el original no llega a 4.5:1 como texto: `superficie` (#17151F, un paso sobre la noche), `texto-suave` (#B4ACCF, del gris violeta) y `usuario` (#9D93F0, del violeta). `#D7263D`, `#6A5ACD` y `#4B4862` solo se usan como gráfico (contornos, suelo, separadores), nunca para texto.
+
+| Token | Valor | Uso |
+| --- | --- | --- |
+| `--color-fondo` | #0F0E17 | Página y escenario |
+| `--color-superficie` | #17151F | Caja de diálogo, marcador, campos |
+| `--color-borde` / `--color-texto` | #F6E7C3 | Bordes duros y texto principal |
+| `--color-borde-suave` | #4B4862 | Separadores decorativos |
+| `--color-texto-suave` | #B4ACCF | Texto secundario |
+| `--color-angel` | #7ED6FF | Ángel: nombre, barra, botón «Escucha al angelito» |
+| `--color-angel-brillo` / `--color-acento` | #FFC857 | Halo, foco, selección, sugerido |
+| `--color-diablo` | #FF4D6D | Diablo: nombre, barra, botón principal, «Dale al diablongo» |
+| `--color-diablo-fuego` | #D7263D | Contorno del logo, borde del ícono |
+| `--color-violeta` | #6A5ACD | Suelo del escenario |
+| `--color-usuario` | #9D93F0 | Lo que dice o pregunta la persona |
+| `--color-error` | #FFA8B6 | Errores |
 
 - **CSS** usa los tokens `--color-*`; las variables viejas (`--caja-*`, `--barra-*`, `--nombre-*`, `--arena-*`, `--marcador-*`) apuntan a ellos con `var()`.
 - **Canvas de la tarjeta** importa `TOKENS` de `lib/paleta.ts` (no lee el DOM: es más simple y no depende de cuándo cargue el CSS). Las fuentes sí las lee de las variables CSS del `<html>` y espera a `document.fonts.load()` antes de pintar.
-- **Fuente de verdad**: `lib/paleta.ts`. `node scripts/contraste.ts` falla (exit 1) si `globals.css` no repite exactamente esos valores o si un par de texto baja de 4.5:1.
+- **Fuente de verdad**: `lib/paleta.ts`. `node scripts/contraste.ts` falla (exit 1) si `globals.css` no repite exactamente esos valores o si un par baja de su mínimo.
 
 ### Contraste calculado (WCAG, `node scripts/contraste.ts`)
 
 | Texto / elemento | Fondo | Contraste | Mínimo | Uso |
 | --- | --- | --- | --- | --- |
-| --color-texto #f5f2ea | --color-fondo #14121c | 16.57:1 | 4.5 | texto sobre el fondo |
-| --color-texto #f5f2ea | --color-superficie #0d0a14 | 17.53:1 | 4.5 | texto en la caja de diálogo |
-| --color-texto-suave #c7c2d8 | --color-fondo #14121c | 10.71:1 | 4.5 | texto suave sobre el fondo |
-| --color-texto-suave #c7c2d8 | --color-superficie #0d0a14 | 11.34:1 | 4.5 | texto suave en la caja |
-| --color-angel #ffcc3a | --color-fondo #14121c | 12.31:1 | 4.5 | nombre del Ángel sobre el fondo |
-| --color-angel #ffcc3a | --color-superficie #0d0a14 | 13.03:1 | 4.5 | nombre del Ángel en la caja |
-| --color-angel-brillo #fff3a0 | --color-superficie #0d0a14 | 17.35:1 | 4.5 | halo brillante en la caja |
-| --color-diablo #f0685c | --color-fondo #14121c | 6.04:1 | 4.5 | nombre del Diablo sobre el fondo |
-| --color-diablo #f0685c | --color-superficie #0d0a14 | 6.39:1 | 4.5 | nombre del Diablo en la caja |
-| --color-diablo-fuego #ff8a2a | --color-superficie #0d0a14 | 8.33:1 | 4.5 | fuego del Diablo en la caja |
-| --color-usuario #8fd3ff | --color-fondo #14121c | 11.41:1 | 4.5 | texto del usuario sobre el fondo |
-| --color-usuario #8fd3ff | --color-superficie #0d0a14 | 12.08:1 | 4.5 | texto del usuario en la caja |
-| --color-acento #ffe066 | --color-superficie #0d0a14 | 15.04:1 | 4.5 | acento en la caja |
-| --color-error #ffa8a0 | --color-fondo #14121c | 10.03:1 | 4.5 | error sobre el fondo |
-| --color-error #ffa8a0 | --color-superficie #0d0a14 | 10.61:1 | 4.5 | error en la caja |
-| --color-borde #ffffff | --color-fondo #14121c | 18.53:1 | 3 | borde sobre el fondo (gráfico) |
+| --color-texto #F6E7C3 | --color-fondo #0F0E17 | 15.64:1 | 4.5 | texto sobre el fondo |
+| --color-texto #F6E7C3 | --color-superficie #17151F | 14.73:1 | 4.5 | texto en la caja de diálogo |
+| --color-texto-suave #B4ACCF | --color-fondo #0F0E17 | 8.89:1 | 4.5 | texto suave sobre el fondo |
+| --color-texto-suave #B4ACCF | --color-superficie #17151F | 8.37:1 | 4.5 | texto suave en la caja |
+| --color-angel #7ED6FF | --color-fondo #0F0E17 | 11.82:1 | 4.5 | nombre del Ángel sobre el fondo |
+| --color-angel #7ED6FF | --color-superficie #17151F | 11.13:1 | 4.5 | nombre del Ángel en la caja |
+| --color-angel-brillo #FFC857 | --color-superficie #17151F | 11.73:1 | 4.5 | halo brillante en la caja |
+| --color-diablo #FF4D6D | --color-fondo #0F0E17 | 5.96:1 | 4.5 | nombre del Diablo sobre el fondo |
+| --color-diablo #FF4D6D | --color-superficie #17151F | 5.62:1 | 4.5 | nombre del Diablo en la caja |
+| --color-diablo-fuego #D7263D | --color-superficie #17151F | 3.64:1 | 3 | rojo oscuro del Diablo en la caja (gráfico) |
+| --color-violeta #6A5ACD | --color-fondo #0F0E17 | 3.61:1 | 3 | suelo violeta del escenario (gráfico) |
+| --color-usuario #9D93F0 | --color-fondo #0F0E17 | 7.18:1 | 4.5 | texto del usuario sobre el fondo |
+| --color-usuario #9D93F0 | --color-superficie #17151F | 6.76:1 | 4.5 | texto del usuario en la caja |
+| --color-acento #FFC857 | --color-superficie #17151F | 11.73:1 | 4.5 | acento en la caja |
+| --color-fondo #0F0E17 | --color-diablo #FF4D6D | 5.96:1 | 4.5 | texto del botón rojo |
+| --color-error #FFA8B6 | --color-fondo #0F0E17 | 10.52:1 | 4.5 | error sobre el fondo |
+| --color-error #FFA8B6 | --color-superficie #17151F | 9.91:1 | 4.5 | error en la caja |
+| --color-borde #F6E7C3 | --color-fondo #0F0E17 | 15.64:1 | 3 | borde sobre el fondo (gráfico) |
 
 Texto normal mínimo 4.5:1 (AA); bordes y elementos gráficos, 3:1.
 
@@ -144,4 +172,4 @@ Mira **[docs/cuentas.md](./docs/cuentas.md)** para esquema, RLS, movimiento de c
 
 ## Capturas de referencia
 
-`docs/estilo-arena.png`, `docs/estilo-final.png`, `docs/estilo-config.png`, `docs/tarjeta-con.png` (volcado real del canvas con `/arena-demo?final=con&volcado=1`).
+Marca Diablongo: `docs/marca-inicio.png` (configuración en escritorio), `docs/marca-movil.png` (a 400 px), `docs/marca-final.png` (elección final) y `docs/marca-icono.png` (ícono de 180 px). Anteriores a la marca: `docs/estilo-arena.png`, `docs/estilo-final.png`, `docs/estilo-config.png`, `docs/tarjeta-con.png` (volcado real del canvas con `/arena-demo?final=con&volcado=1`).

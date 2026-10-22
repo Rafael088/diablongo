@@ -301,8 +301,8 @@ async function callOpenAICompatible(
   // OpenRouter requires an additional header
   const openRouter = esOpenRouter(baseUrl);
   if (openRouter) {
-    headers["HTTP-Referer"] = "https://agent-debate.vercel.app";
-    headers["X-Title"] = "Agent Debate";
+    headers["HTTP-Referer"] = "https://diablongo.vercel.app";
+    headers["X-Title"] = "Diablongo";
   }
   const ocultar = (t: string) => (apiKey ? t.split(apiKey).join("[oculta]") : t);
 

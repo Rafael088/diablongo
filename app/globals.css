@@ -2,18 +2,20 @@
 
 /* Paleta única (espejo de lib/paleta.ts; scripts/contraste.ts comprueba que coinciden). */
 :root {
-  --color-fondo: #14121c;
-  --color-superficie: #0d0a14;
-  --color-borde: #ffffff;
-  --color-texto: #f5f2ea;
-  --color-texto-suave: #c7c2d8;
-  --color-angel: #ffcc3a;
-  --color-angel-brillo: #fff3a0;
-  --color-diablo: #f0685c;
-  --color-diablo-fuego: #ff8a2a;
-  --color-usuario: #8fd3ff;
-  --color-acento: #ffe066;
-  --color-error: #ffa8a0;
+  --color-fondo: #0F0E17;
+  --color-superficie: #17151F;
+  --color-borde: #F6E7C3;
+  --color-borde-suave: #4B4862;
+  --color-texto: #F6E7C3;
+  --color-texto-suave: #B4ACCF;
+  --color-angel: #7ED6FF;
+  --color-angel-brillo: #FFC857;
+  --color-diablo: #FF4D6D;
+  --color-diablo-fuego: #D7263D;
+  --color-violeta: #6A5ACD;
+  --color-usuario: #9D93F0;
+  --color-acento: #FFC857;
+  --color-error: #FFA8B6;
 }
 
 @theme inline {
@@ -53,7 +55,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 *:focus-visible { outline: 3px solid var(--color-acento); outline-offset: 2px; }
 
-/* Arena de Ángel contra Diablo. Colores en variables para la tarea de paleta. */
+/* Arena del angelito contra el Diablongo. */
 /* Variables de componentes: apuntan a los tokens. */
 :root {
   --arena-fondo: var(--color-fondo);
@@ -80,8 +82,11 @@ input[type="range"]::-webkit-slider-thumb {
 .arena-sub { font-size: 0.9rem; color: var(--arena-tenue); }
 .arena-escenario {
   display: flex; align-items: flex-end; justify-content: space-between;
-  gap: 8px; padding: 12px 8px; margin-bottom: 12px;
-  background: var(--arena-fondo);
+  gap: 8px; padding: 12px 8px 18px; margin-bottom: 12px;
+  background: linear-gradient(180deg, var(--arena-fondo) 0 68%,
+    color-mix(in srgb, var(--color-violeta) 30%, var(--arena-fondo)) 68% 84%,
+    color-mix(in srgb, var(--color-violeta) 55%, var(--arena-fondo)) 84%);
+  border-bottom: 4px solid var(--color-violeta);
 }
 .arena-personaje { width: 30%; max-width: 160px; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: opacity 0.2s; }
 .arena-personaje:nth-child(2) { width: 24%; max-width: 128px; }
@@ -218,11 +223,11 @@ input[type="range"]::-webkit-slider-thumb {
 .config-seccion-pro .config-seccion-titulo { color: var(--color-angel); }
 .config-seccion-con .config-seccion-titulo { color: var(--color-diablo); }
 .config-iniciar {
-  width: 100%; padding: 14px; background: var(--color-angel); color: var(--color-superficie);
+  width: 100%; padding: 14px; background: var(--color-diablo); color: var(--color-fondo);
   border: 4px solid var(--color-borde); border-radius: 0; cursor: pointer;
   font-family: var(--font-dialogo), system-ui, sans-serif; font-weight: 700; font-size: 1.15rem;
 }
-.config-iniciar:hover:not(:disabled) { background: var(--color-angel-brillo); }
+.config-iniciar:hover:not(:disabled) { background: var(--color-acento); }
 .config-iniciar:disabled { background: var(--color-superficie); color: var(--color-texto-suave); cursor: not-allowed; }
 .config-nota { text-align: center; color: var(--color-texto-suave); font-size: 1rem; }
 
@@ -245,3 +250,44 @@ input[type="range"]::-webkit-slider-thumb {
 @media (min-width: 768px) {
   .caja-dialogo { font-size: 1.35rem; }
 }
+
+/* Marca Diablongo: logo, cabecera y elección final como el ejemplo de interfaz del tablero. */
+.logo { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.logo-palabra { position: relative; margin: 0; padding-top: 0.55em; font-size: clamp(1.5rem, 7vw, 2.75rem); line-height: 1; }
+.logo-texto {
+  font-family: var(--font-titulo), ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.02em;
+  background: linear-gradient(180deg, var(--color-texto) 0 40%, var(--color-acento) 40% 70%, var(--color-diablo) 70%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  /* Contorno rojo duro, en escalones, y sombra noche debajo. */
+  filter: drop-shadow(3px 0 0 var(--color-diablo-fuego)) drop-shadow(-3px 0 0 var(--color-diablo-fuego))
+          drop-shadow(0 3px 0 var(--color-diablo-fuego)) drop-shadow(0 -3px 0 var(--color-diablo-fuego))
+          drop-shadow(0 5px 0 var(--color-fondo));
+}
+.logo-cuerno { position: absolute; top: 0; width: 0.5em; height: auto; }
+.logo-cuerno:first-child { left: 0.15em; }
+.logo-cuerno:last-child { right: 0.15em; }
+.logo-lema { margin: 0; font-family: var(--font-titulo), ui-monospace, monospace; font-size: 0.65rem; line-height: 1.6; color: var(--color-texto-suave); text-transform: uppercase; text-align: center; }
+
+.marca-cabecera { display: flex; align-items: flex-end; justify-content: center; gap: 12px; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid var(--color-borde-suave); }
+.marca-sprite { flex: none; width: 64px; }
+.marca-sprite svg { width: 100%; height: auto; }
+@media (max-width: 520px) { .marca-sprite { display: none; } }
+
+.eleccion-botones { display: flex; flex-direction: column; gap: 10px; }
+.eleccion-boton {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 14px; text-align: left;
+  background: var(--color-fondo); color: var(--color-texto); border: 3px solid; border-radius: 0; cursor: pointer;
+  font-family: var(--font-dialogo), system-ui, sans-serif;
+}
+.eleccion-boton svg { flex: none; width: 48px; height: 48px; }
+.eleccion-pro { border-color: var(--color-angel); }
+.eleccion-con { border-color: var(--color-diablo); }
+.eleccion-titulo { display: block; font-weight: 700; font-size: 1.1rem; line-height: 1.3; }
+.eleccion-pro .eleccion-titulo { color: var(--color-angel); }
+.eleccion-con .eleccion-titulo { color: var(--color-diablo); }
+.eleccion-detalle { display: block; font-size: 0.95rem; color: var(--color-texto-suave); }
+.eleccion-boton:hover { background: var(--color-superficie); }
+.eleccion-pro:hover { box-shadow: inset 0 0 0 2px var(--color-angel); }
+.eleccion-con:hover { box-shadow: inset 0 0 0 2px var(--color-diablo); }
+.eleccion-boton.caja-boton-sugerido { box-shadow: 0 0 0 3px var(--color-acento); }
+.eleccion-sugerido { display: block; margin-top: 2px; font-size: 0.85rem; color: var(--color-acento); }

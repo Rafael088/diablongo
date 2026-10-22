@@ -76,7 +76,7 @@ function pintarTarjeta(
 
   ctx.fillStyle = C["--color-superficie"];
   ctx.fillRect(0, 0, TARJETA_ANCHO, TARJETA_ALTO);
-  // Borde blanco grueso estilo Undertale.
+  // Borde crema grueso estilo Undertale.
   ctx.strokeStyle = C["--color-borde"];
   ctx.lineWidth = 20;
   ctx.strokeRect(50, 50, TARJETA_ANCHO - 100, TARJETA_ALTO - 100);
@@ -118,10 +118,10 @@ function pintarTarjeta(
   const lineas = envolver(ctx, desenlace, 840).slice(0, 4);
   lineas.forEach((l, i) => ctx.fillText(l, centro, 1115 + i * 54));
 
-  // Marca provisional.
-  ctx.fillStyle = C["--color-texto-suave"];
+  // Marca.
+  ctx.fillStyle = C["--color-diablo"];
   ctx.font = `22px ${f.titulo}`;
-  ctx.fillText(MARCA_TARJETA, centro, 1278);
+  ctx.fillText(MARCA_TARJETA.toUpperCase(), centro, 1278);
 }
 
 const sinSuscripcion = () => () => {};

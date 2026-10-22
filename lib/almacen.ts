@@ -117,7 +117,7 @@ export function obtenerAlmacen(env: NodeJS.ProcessEnv = process.env): Almacen | 
   if (!avisado) {
     avisado = true;
     console.warn(
-      "[agent-debate] Faltan UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN: uso un almacén en memoria solo para development (no es global ni persistente)."
+      "[diablongo] Faltan UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN: uso un almacén en memoria solo para development (no es global ni persistente)."
     );
   }
   actual = new AlmacenMemoria();

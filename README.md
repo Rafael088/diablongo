@@ -1,6 +1,8 @@
-# Agent Debate
+# Diablongo
 
-Pon a dos IAs a debatir cualquier tema. Ángel vs Diablo en una arena visual de pixel art. App web construida con Next.js, TypeScript y Tailwind.
+![Diablongo](docs/marca-inicio.png)
+
+**Tu cabeza es un campo de batalla.** Cuéntale tu dilema y el angelito y el Diablongo se lo pelean en frases cortas; al final tú eliges a quién le haces caso. Juego en pixel art hecho con Next.js, TypeScript y Tailwind. En vivo: [diablongo.vercel.app](https://diablongo.vercel.app).
 
 ## Características
 
@@ -11,7 +13,7 @@ Pon a dos IAs a debatir cualquier tema. Ángel vs Diablo en una arena visual de 
   - **Mi key**: tu propia API key en la pestaña, opcional recordar en el dispositivo.
   - **Con créditos**: modelos mejores usando Supabase y Mercado Pago; 1 crédito por debate.
 - **Cuentas opcionales**: Supabase con Google y enlace al correo; compra de créditos con Mercado Pago Checkout Pro.
-- **Diseño tipo videojuego**: arena visual con animaciones, tarjetas y sprites de 32×32 en pixel art.
+- **Diseño tipo videojuego**: arena visual con animaciones, tarjetas y sprites de 32×32 en pixel art, con la marca Diablongo (paleta, logo y diseño en [DESIGN.md](./DESIGN.md)).
 - **Servidor mínimo**: rutas de Next.js (App Router) en Vercel; las cuentas y el saldo viven en Supabase.
 
 ## Cómo empezar
@@ -72,6 +74,8 @@ npm run dev          # Desarrollo en http://localhost:3000
 npm test             # Pruebas (Vitest), incluida la migración de Supabase sobre PGlite
 npm run lint         # ESLint
 npm run typecheck    # TypeScript
+node scripts/contraste.ts      # Comprueba que la paleta cumple el contraste WCAG
+node scripts/generar-iconos.ts # Regenera favicon e íconos desde el sprite del Diablo
 npm run seguridad    # Prueba de seguridad de los personajes: 15 temas delicados (necesita OPENROUTER_API_KEY)
 ```
 

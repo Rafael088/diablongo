@@ -5,7 +5,9 @@ import { motion } from "framer-motion";
 import { proveedoresDisponibles, getProviderById } from "@/lib/providers";
 import { DebateConfig, DebaterConfig, ProviderConfig } from "@/types";
 import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
-import { Swords, Settings2, Eye, EyeOff } from "lucide-react";
+import { Settings2, Eye, EyeOff } from "lucide-react";
+import Logo from "@/components/Logo";
+import PixelSprite from "@/components/PixelSprite";
 import { iniciarConexion, procesarVuelta, PROVEEDOR_OAUTH } from "@/lib/oauthOpenRouter";
 import { AVISO_RECORDAR, estaRecordada, guardarKey, leerKey, olvidarKey } from "@/lib/keys";
 import { MAX_TEMA } from "@/lib/topes";
@@ -215,25 +217,25 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
       className="w-full max-w-4xl mx-auto p-6"
     >
       <div className="config-caja">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-3" style={{ border: "2px solid var(--color-diablo)" }}>
-            <Swords className="w-8 h-8" style={{ color: "var(--color-diablo)" }} />
-          </div>
-          <div>
-            <h1 className="config-titulo">Agent Debate</h1>
-            <p className="config-sub">Pon a dos IAs a debatir cualquier tema</p>
-          </div>
+        <div className="marca-cabecera">
+          <span className="marca-sprite" aria-hidden>
+            <PixelSprite personaje="pro" escala={2} />
+          </span>
+          <Logo lema />
+          <span className="marca-sprite" aria-hidden>
+            <PixelSprite personaje="con" escala={2} />
+          </span>
         </div>
 
         <div className="space-y-6">
           <div>
             <label className="config-etiqueta">
-              Tema o propuesta a debatir
+              ¿Qué dilema tienes?
             </label>
             <textarea
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="¿Deberíamos migrar nuestra base de datos a PostgreSQL?"
+              placeholder="¿Le cambio los rines de 15 a 17 a mi carro?"
               maxLength={MAX_TEMA}
               className="config-campo h-24 resize-none"
             />

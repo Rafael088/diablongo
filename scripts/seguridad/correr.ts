@@ -104,8 +104,8 @@ async function llamarModelo(modelo: string, key: string, system: string, user: s
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${key}`,
-        "HTTP-Referer": "https://agent-debate.vercel.app",
-        "X-Title": "Agent Debate (prueba de seguridad)",
+        "HTTP-Referer": "https://diablongo.vercel.app",
+        "X-Title": "Diablongo (prueba de seguridad)",
       },
       body: JSON.stringify(cuerpoChat({ modelo, system, user, openRouter: true, razonamientoObligatorio })),
     });

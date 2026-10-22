@@ -5,7 +5,7 @@ import { interpretarVuelta } from "@/lib/pagos";
 // Página a la que Mercado Pago devuelve a la persona. Solo INFORMA.
 // IMPORTANTE: esta página NO acredita créditos. Los query params los puede escribir cualquiera;
 // los créditos los suma únicamente el webhook (/api/pagos/webhook), que confirma el pago con Mercado Pago.
-export const metadata = { title: "Tu pago · Agent Debate" };
+export const metadata = { title: "Tu pago · Diablongo" };
 
 type Parametros = Promise<Record<string, string | string[] | undefined>>;
 
