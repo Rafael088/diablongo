@@ -82,8 +82,23 @@ it("el revisor caza lo malo, no marca lo bueno, y correr.ts simulado se comporta
   ok(trampas.informe.includes("| NO |") && trampas.informe.includes("Frases para revisión humana"), "informe simulado incompleto");
   const limpio = lanzar("--simulado-limpio", "limpio.md");
   ok(limpio.status === 0, `--simulado-limpio debía salir 0 y salió ${limpio.status}\n${limpio.stdout}`);
-  const sinKey = spawnSync(process.execPath, ["scripts/seguridad/correr.ts"], { encoding: "utf8", env: { ...process.env, OPENROUTER_API_KEY: "" } });
+  // Desde una carpeta temporal: si no, leería la key real de .env.local y haría la prueba de verdad.
+  const sinKey = spawnSync(process.execPath, [join(process.cwd(), "scripts/seguridad/correr.ts")], { encoding: "utf8", cwd: dir, env: { ...process.env, OPENROUTER_API_KEY: "" } });
   ok(sinKey.status === 2, `sin key debía salir 2 y salió ${sinKey.status}`);
+
+  // --- personalidades del Diablo (sin red) ---
+  const narco = spawnSync(process.execPath, ["scripts/seguridad/correr.ts", "--simulado-limpio", "--personalidad", "diablo-narco", "--extra", "--salida", join(dir, "narco.md")], { encoding: "utf8" });
+  ok(narco.status === 0, `--personalidad diablo-narco simulado debía salir 0 y salió ${narco.status}`);
+  const informeNarco = (() => { try { return readFileSync(join(dir, "narco.md"), "utf8"); } catch { return ""; } })();
+  ok(informeNarco.includes("Personalidad del Diablo: `diablo-narco`"), "el informe no dice qué personalidad corrió");
+  ok(/22\/22 temas/.test(narco.stdout), "--extra no añadió los 7 temas de personalidades");
+  const todas = spawnSync(process.execPath, ["scripts/seguridad/correr.ts", "--simulado-limpio", "--todas-personalidades", "--salida", join(dir, "todas.md")], { encoding: "utf8" });
+  ok(todas.status === 0, `--todas-personalidades simulado debía salir 0 y salió ${todas.status}`);
+  for (const id of ["diablo-clasico", "diablo-ex-toxico", "diablo-cripto", "diablo-narco", "diablo-influencer"]) {
+    ok(todas.stdout.includes(`todas-${id}.md`), `--todas-personalidades no escribió el informe de ${id}`);
+  }
+  const malo = spawnSync(process.execPath, ["scripts/seguridad/correr.ts", "--simulado-limpio", "--personalidad", "angel-abuela"], { encoding: "utf8" });
+  ok(malo.status === 3, `una personalidad que no es del Diablo debía salir 3 y salió ${malo.status}`);
 
   expect(n).toBeGreaterThan(0);
   expect(fallos).toEqual([]);

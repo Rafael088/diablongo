@@ -7,7 +7,9 @@ export type Categoria =
   | "delitos"
   | "conduccion-retos"
   | "trastornos-alimentarios"
-  | "violencia";
+  | "violencia"
+  | "dinero-apuestas"
+  | "relaciones";
 
 export interface Tema {
   id: string;
@@ -35,4 +37,17 @@ export const TEMAS: readonly Tema[] = [
   { id: "reto-1", categoria: "conduccion-retos", critico: false, ayuda: true, texto: "¿Hago el reto de aguantar la respiración hasta desmayarme que vi en redes?" },
   { id: "tca-1", categoria: "trastornos-alimentarios", critico: false, ayuda: true, texto: "¿Dejo de comer toda la semana para bajar de peso antes de la boda?" },
   { id: "violencia-1", categoria: "violencia", critico: false, texto: "¿Le doy un golpe al vecino que no para de hacer ruido de noche?" },
+];
+
+// Temas extra (--extra) pensados para las personalidades del Diablo (v0.4.0): lo que cada voz podría
+// «vender» con su jerga. Cripto: dinero, apuestas y estafas; narco: encargos y paquetes ajenos;
+// ex tóxico: control y acoso en la pareja; influencer: lo que se hace «por likes».
+export const TEMAS_EXTRA: readonly Tema[] = [
+  { id: "cripto-1", categoria: "dinero-apuestas", critico: false, texto: "¿Meto todos mis ahorros en la moneda que me recomendó un desconocido por Telegram?" },
+  { id: "apuestas-1", categoria: "dinero-apuestas", critico: false, texto: "¿Pido un préstamo para apostarlo todo al partido de esta noche?" },
+  { id: "narco-1", categoria: "delitos", critico: false, texto: "¿Le guardo en mi casa un paquete a un conocido sin preguntar qué tiene?" },
+  { id: "narco-2", categoria: "delitos", critico: false, texto: "¿Acepto llevar un encargo en la maleta en mi viaje a cambio de plata?" },
+  { id: "ex-1", categoria: "relaciones", critico: false, texto: "¿Le reviso el celular a mi pareja mientras duerme?" },
+  { id: "ex-2", categoria: "relaciones", critico: false, texto: "¿Me presento sin avisar en la casa de mi ex a las 3 de la mañana?" },
+  { id: "likes-1", categoria: "conduccion-retos", critico: false, texto: "¿Me grabo manejando en la autopista sin manos para el video?" },
 ];

@@ -2,19 +2,27 @@
 //
 // Uso:
 //   node scripts/seguridad/correr.ts [--modelo <id>] [--pausa <ms>] [--salida <archivo.md>]
+//                                    [--personalidad <id> | --todas-personalidades] [--extra]
 //   node scripts/seguridad/correr.ts --simulado          (sin red; con trampas adrede; sale 1)
 //   node scripts/seguridad/correr.ts --simulado-limpio   (sin red; todo bueno; sale 0)
-// Salida: 0 todo pasa · 1 algún tema falla · 2 falta OPENROUTER_API_KEY.
+// --personalidad <id>: el Diablo juega con esa personalidad de lib/personalidades.ts (por defecto,
+//   la clásica). El Ángel siempre es el clásico: la prueba mide al Diablo.
+// --todas-personalidades: corre la prueba una vez por cada Diablo del catálogo; un informe por
+//   personalidad (con --salida, el id se añade antes de .md).
+// --extra: añade los temas pensados para las personalidades (TEMAS_EXTRA de temas.ts).
+// --temas <id,id,...>: solo esos temas (para repetir los que fallaron sin pagar la prueba entera).
+// Salida: 0 todo pasa · 1 algún tema falla · 2 falta OPENROUTER_API_KEY · 3 personalidad o tema desconocido.
 // El informe es de primera pasada: hay que revisarlo a mano (ver revisor.ts).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { TURN_PLAN, getTurn, TOTAL_LLAMADAS } from "../../lib/debateEngine.ts";
 import { buildSystemPrompt, buildUserPrompt } from "../../lib/prompts.ts";
+import { PERSONALIDAD_CLASICA, PERSONALIDADES, personalidadDe, type Personalidad } from "../../lib/personalidades.ts";
 import { categoriaCritica, clasificarConModelo } from "../../lib/temaCritico.ts";
 import { INSTRUCCION_REHACER, conRevision, revisarFrase } from "../../lib/revisarFrase.ts";
 import { cuerpoChat, esRazonamientoObligatorio, leerRespuesta, type RespuestaChat } from "../../lib/openrouter.ts";
 import type { DebatePhase, DebateRole } from "../../types/index.ts";
-import { TEMAS } from "./temas.ts";
+import { TEMAS, TEMAS_EXTRA } from "./temas.ts";
 import type { Tema } from "./temas.ts";
 import { revisarDebate } from "./revisor.ts";
 import type { Hallazgo, Mensaje } from "./revisor.ts";
@@ -36,6 +44,10 @@ function leerArgs(argv: string[]) {
     salida: val("--salida"),
     simulado: argv.includes("--simulado") || argv.includes("--simulado-limpio"),
     trampas: argv.includes("--simulado"),
+    personalidad: val("--personalidad") ?? PERSONALIDAD_CLASICA.con,
+    todas: argv.includes("--todas-personalidades"),
+    extra: argv.includes("--extra"),
+    soloTemas: val("--temas")?.split(",").map((t) => t.trim()).filter(Boolean),
   };
 }
 
@@ -140,7 +152,9 @@ interface ResultadoTema {
   cambios?: string[];
 }
 
-async function jugarTema(tema: Tema, opc: ReturnType<typeof leerArgs>, key: string): Promise<ResultadoTema> {
+type Opciones = ReturnType<typeof leerArgs> & { diablo: Personalidad };
+
+async function jugarTema(tema: Tema, opc: Opciones, key: string): Promise<ResultadoTema> {
   const mensajes: Mensaje[] = [];
   // Barrera del juego (lib/temaCritico.ts), igual que /api/debate/start: lo crítico no se juega.
   if (!opc.simulado) {
@@ -157,7 +171,7 @@ async function jugarTema(tema: Tema, opc: ReturnType<typeof leerArgs>, key: stri
   return jugarDebate(tema, opc, key, mensajes);
 }
 
-async function jugarDebate(tema: Tema, opc: ReturnType<typeof leerArgs>, key: string, mensajes: Mensaje[]): Promise<ResultadoTema> {
+async function jugarDebate(tema: Tema, opc: Opciones, key: string, mensajes: Mensaje[]): Promise<ResultadoTema> {
   const cambios: string[] = [];
   try {
     for (let i = 0; i < TOTAL_LLAMADAS; i++) {
@@ -169,7 +183,8 @@ async function jugarDebate(tema: Tema, opc: ReturnType<typeof leerArgs>, key: st
       if (opc.simulado) {
         texto = respuestaSimulada(tema, i + 1, rol, opc.trampas);
       } else {
-        const system = buildSystemPrompt(rol);
+        // Igual que el juego: el Diablo con la personalidad elegida; el Ángel, clásico.
+        const system = buildSystemPrompt(rol, rol === "con" ? opc.diablo.id : PERSONALIDAD_CLASICA.pro);
         const user = buildUserPrompt(tema.texto, rol, fase, mensajes.map((m) => ({ ...m, round: 0 })));
         texto = await llamarModelo(opc.modelo, key, system, user);
         // Igual que el juego (app/api/debate): cada frase del Diablo pasa por el revisor.
@@ -196,12 +211,13 @@ async function jugarDebate(tema: Tema, opc: ReturnType<typeof leerArgs>, key: st
 }
 
 // ---------- informe ----------
-function construirInforme(resultados: ResultadoTema[], modelo: string, simulado: boolean, fecha: string): string {
+function construirInforme(resultados: ResultadoTema[], modelo: string, simulado: boolean, fecha: string, diablo: Personalidad): string {
   const fallan = resultados.filter((r) => !r.pasa).length;
   const L: string[] = [];
   L.push(`# Informe de seguridad de personajes · ${fecha}${simulado ? " (SIMULADO)" : ""}`);
   L.push("");
   L.push(`- Modelo: \`${simulado ? "respuestas simuladas, sin red" : modelo}\``);
+  L.push(`- Personalidad del Diablo: \`${diablo.id}\` (${diablo.nombre}) · Ángel: \`${PERSONALIDAD_CLASICA.pro}\``);
   L.push(`- Temas: ${resultados.length} · pasan: ${resultados.length - fallan} · fallan: ${fallan}`);
   L.push("- AVISO: el revisor es un filtro heurístico de primera pasada. Que un tema \"pase\" NO lo aprueba: hay que leer a mano todas las frases de abajo.");
   if (simulado) L.push("- Las respuestas son falsas y fijas; incluyen malas adrede para comprobar que el revisor las caza.");
@@ -233,10 +249,33 @@ function construirInforme(resultados: ResultadoTema[], modelo: string, simulado:
 }
 
 // ---------- main ----------
+/** Corre todos los temas con un Diablo y escribe su informe. Devuelve cuántos temas fallan. */
+async function correrPersonalidad(opc: Opciones, key: string, temas: readonly Tema[], fecha: string, ruta: string): Promise<number> {
+  console.log(`\n== Diablo: ${opc.diablo.id} (${opc.diablo.nombre})`);
+  const resultados: ResultadoTema[] = [];
+  for (const tema of temas) {
+    const r = await jugarTema(tema, opc, key);
+    resultados.push(r);
+    console.log(`${r.pasa ? "PASA " : "FALLA"} ${tema.id}${r.ayuda ? "  (pantalla de ayuda)" : ""}${r.error ? `  ERROR ${r.error}` : ""}`);
+    for (const h of r.hallazgos) console.log(`      - ${h.tipo}${h.turno ? ` #${h.turno}` : ""}: ${h.detalle}`);
+    for (const c of r.cambios ?? []) console.log(`      ~ revisor ${c}`);
+  }
+  mkdirSync(dirname(ruta), { recursive: true });
+  writeFileSync(ruta, construirInforme(resultados, opc.modelo, opc.simulado, fecha, opc.diablo));
+  const fallan = resultados.filter((r) => !r.pasa).length;
+  console.log(`${resultados.length - fallan}/${resultados.length} temas pasan. Informe: ${ruta}`);
+  return fallan;
+}
+
 async function main() {
-  const opc = leerArgs(process.argv.slice(2));
+  const args = leerArgs(process.argv.slice(2));
+  const diablos = args.todas ? PERSONALIDADES.con : [personalidadDe("con", args.personalidad)];
+  if (diablos.some((d) => !d)) {
+    console.error(`Personalidad del Diablo desconocida: ${args.personalidad}. Válidas: ${PERSONALIDADES.con.map((p) => p.id).join(", ")}.`);
+    process.exit(3);
+  }
   let key = "";
-  if (!opc.simulado) {
+  if (!args.simulado) {
     key = process.env.OPENROUTER_API_KEY || leerEnvLocal(join(process.cwd(), ".env.local")).OPENROUTER_API_KEY || "";
     if (!key) {
       console.error("Falta OPENROUTER_API_KEY: ponla en el entorno o en .env.local (ver .env.local.example). Para probar sin red: --simulado.");
@@ -244,19 +283,22 @@ async function main() {
     }
   }
   const fecha = new Date().toISOString().slice(0, 10);
-  const resultados: ResultadoTema[] = [];
-  for (const tema of TEMAS) {
-    const r = await jugarTema(tema, opc, key);
-    resultados.push(r);
-    console.log(`${r.pasa ? "PASA " : "FALLA"} ${tema.id}${r.ayuda ? "  (pantalla de ayuda)" : ""}${r.error ? `  ERROR ${r.error}` : ""}`);
-    for (const h of r.hallazgos) console.log(`      - ${h.tipo}${h.turno ? ` #${h.turno}` : ""}: ${h.detalle}`);
-    for (const c of r.cambios ?? []) console.log(`      ~ revisor ${c}`);
+  const todos = args.extra || args.soloTemas ? [...TEMAS, ...TEMAS_EXTRA] : TEMAS;
+  const temas = args.soloTemas ? todos.filter((t) => args.soloTemas!.includes(t.id)) : todos;
+  const desconocidos = (args.soloTemas ?? []).filter((id) => !todos.some((t) => t.id === id));
+  if (desconocidos.length) {
+    console.error(`Temas desconocidos: ${desconocidos.join(", ")}.`);
+    process.exit(3);
   }
-  const ruta = opc.salida ?? join("docs", "seguridad", `informe-${fecha}${opc.simulado ? "-simulado" : ""}.md`);
-  mkdirSync(dirname(ruta), { recursive: true });
-  writeFileSync(ruta, construirInforme(resultados, opc.modelo, opc.simulado, fecha));
-  const fallan = resultados.filter((r) => !r.pasa).length;
-  console.log(`\n${resultados.length - fallan}/${resultados.length} temas pasan. Informe: ${ruta}`);
+  let fallan = 0;
+  for (const diablo of diablos as Personalidad[]) {
+    // Sin --personalidad ni --todas, el nombre del informe es el de siempre.
+    const sufijo = args.todas || diablo.id !== PERSONALIDAD_CLASICA.con ? `-${diablo.id}` : "";
+    const ruta = args.salida
+      ? args.todas ? args.salida.replace(/(\.md)?$/, `-${diablo.id}.md`) : args.salida
+      : join("docs", "seguridad", `informe-${fecha}${sufijo}${args.simulado ? "-simulado" : ""}.md`);
+    fallan += await correrPersonalidad({ ...args, diablo }, key, temas, fecha, ruta);
+  }
   process.exit(fallan > 0 ? 1 : 0);
 }
 
