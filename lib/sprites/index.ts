@@ -3,6 +3,7 @@ import { ANGEL } from "./angel.ts";
 import { DIABLO } from "./diablo.ts";
 import { USUARIO } from "./usuario.ts";
 import { PALETA_SPRITES, TRANSPARENTE } from "./paleta.ts";
+import { matrizVariante } from "./variantes.ts";
 import type {
   FotogramaDebatiente,
   FotogramaSprite,
@@ -12,6 +13,7 @@ import type {
 } from "./tipos.ts";
 
 export { PALETA_SPRITES, TRANSPARENTE };
+export { matrizVariante, tieneVariante, idsConVariante, VARIANTES } from "./variantes.ts";
 export type { CaracterPaleta } from "./paleta.ts";
 export type {
   FotogramaDebatiente,
@@ -45,7 +47,12 @@ export function fotogramasDe(personaje: PersonajeSprite): FotogramaSprite[] {
 export function matrizDe(
   personaje: PersonajeSprite,
   fotograma: FotogramaSprite,
+  /** Id de personalidad (lib/personalidades.ts): pinta su variante sobre el sprite base. Solo Ángel y Diablo. */
+  personalidad?: string,
 ): MatrizSprite {
+  if (personalidad && personaje !== "usuario" && fotograma !== "pensar" && fotograma !== "decidir") {
+    return matrizVariante(personaje, personalidad, fotograma);
+  }
   const frames = SPRITES[personaje] as Record<string, MatrizSprite>;
   return frames[fotograma] ?? frames.reposo;
 }

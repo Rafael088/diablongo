@@ -392,13 +392,19 @@ function SelectorPersonalidad(props: { rol: DebateRole; valor: string; onChange:
       <label htmlFor={idCampo} className="config-seccion-titulo">
         {rol === "pro" ? "Personalidad del Ángel" : "Personalidad del Diablo"}
       </label>
-      <select id={idCampo} value={elegida.id} onChange={(e) => onChange(e.target.value)} className="config-campo">
-        {PERSONALIDADES[rol].map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.nombre}
-          </option>
-        ))}
-      </select>
+      <div className="config-personalidad">
+        {/* Vista previa: el sprite del personaje con la personalidad elegida (decorativo; el nombre ya está en el selector). */}
+        <span aria-hidden="true" className="config-personalidad-vista">
+          <PixelSprite personaje={rol} fotograma="reposo" escala={2} personalidad={elegida.id} />
+        </span>
+        <select id={idCampo} value={elegida.id} onChange={(e) => onChange(e.target.value)} className="config-campo">
+          {PERSONALIDADES[rol].map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
       <p className="config-nota">{elegida.descripcion}</p>
     </div>
   );

@@ -165,3 +165,15 @@ export function validarPersonalidad(
   if (!conCreditos && !esClasica(rol, p.id)) return { ok: false, error: MENSAJE_PERSONALIDAD_SOLO_CREDITOS };
   return { ok: true, id: p.id };
 }
+
+const NOMBRE_CLASICO: Readonly<Record<DebateRole, string>> = { pro: "Ángel", con: "Diablo" };
+
+/**
+ * Nombre que se ve en la arena y en la tarjeta final. La clásica (y cualquier id desconocido o de
+ * otro rol) conserva «Ángel» / «Diablo», como antes de las personalidades; las demás muestran su
+ * nombre del catálogo («Abuela», «Cripto»…).
+ */
+export function nombreVisible(rol: DebateRole, id: string | undefined): string {
+  const p = personalidadOClasica(rol, id);
+  return p.id === PERSONALIDAD_CLASICA[rol] ? NOMBRE_CLASICO[rol] : p.nombre;
+}
