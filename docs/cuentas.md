@@ -13,6 +13,9 @@ y Better Auth + Neon (más piezas).
 | --- | --- |
 | Esquema: `saldos`, `movimientos`, RLS y las funciones que mueven créditos | `supabase/migrations/20261020000000_cuentas_creditos.sql` |
 | Envoltorio para el servidor (`acreditarCompra`, `descontarDebate`, `devolverDebate`) | `lib/creditos.ts` |
+| Esquema de retos: `debate_frases`, `retos`, `votos_reto`, RLS y sus funciones | `supabase/migrations/20261023000000_retos.sql` |
+| Envoltorio de retos (`registrarFrase`, `crearReto`, `leerReto`, `registrarVoto`, `retosDeUsuario`) | `lib/retos.ts` |
+| Guardar un debate como reto | `POST /api/retos` |
 | Clientes: navegador, servidor con sesión, admin con key secreta | `lib/supabase/` |
 | Refresco de la sesión en cada visita | `proxy.ts` |
 | Vuelta del login | `app/auth/callback/route.ts` |
@@ -37,7 +40,8 @@ Cada movimiento queda en `movimientos` con `(motivo, referencia)` único: eso es
 
 1. Crear un proyecto en [supabase.com](https://supabase.com) (región São Paulo, la más cercana a Colombia).
    En el plan gratis el proyecto se pausa tras 7 días sin uso; se reactiva desde el panel.
-2. Correr la migración: pegar el archivo `.sql` en **SQL Editor** y ejecutarlo, o con la CLI
+2. Correr las migraciones **en orden** (`20261020000000_cuentas_creditos.sql` y luego `20261023000000_retos.sql`):
+   pegar cada archivo `.sql` en **SQL Editor** y ejecutarlo, o con la CLI
    `supabase link` + `supabase db push`.
 3. **Authentication → Sign In / Providers**:
    - **Email**: activado. «Confirm email» puede quedar activado (el enlace mágico ya confirma).
@@ -73,6 +77,33 @@ cuenta imitado (`auth.users`, `auth.uid()`, roles): acreditar una sola vez, no q
 debate una sola vez, devolver una sola vez, que cada quien vea solo su saldo y que el navegador no pueda
 mover créditos (`tests/creditos.test.ts`). Lo que no cubre: dos peticiones simultáneas reales (PGlite tiene
 una sola conexión); ahí protege el `UPDATE … WHERE creditos >= n` y el índice único de `movimientos`.
+
+## Retos
+
+Un debate **con créditos** que terminó se puede guardar como reto para que otras personas voten con quién
+se quedan. Qué se guarda (`public.retos`): el tema, las frases de los 8 turnos (y el desenlace si lo hubo),
+la personalidad del Ángel y la del Diablo, lo que eligió quien lo creó (`pro` o `con`) y un id corto público
+de 10 caracteres aleatorios (no se adivina). La cuenta que lo creó no sale nunca en la lectura pública.
+
+**Las frases las pone el servidor.** En cada turno de un debate con créditos, `/api/debate` guarda en
+`public.debate_frases` la frase que acaba de generar (ya pasada por el revisor del Diablo), con el tema
+y la personalidad del token firmado. `POST /api/retos` solo recibe `{ debate, eleccion }` (cualquier otro
+campo, p. ej. `frases`, da 400) y arma el reto con lo guardado. Se eligió Supabase y no Upstash porque el
+modo créditos ya depende de Supabase y el reto acaba ahí; para que no crezca: solo debates con créditos,
+como mucho 9 frases de ≤ 2000 caracteres por debate, se borran al crear el reto, y las que nunca llegaron
+a reto se borran a los 7 días (al empezar esa cuenta otro debate).
+
+Reglas (en Postgres, `crear_reto`): el debate tiene que estar cobrado a esa cuenta y no devuelto, tener
+los 8 turnos guardados y ser de quien tiene la sesión. Un debate da un solo reto: repetir devuelve el mismo
+id sin cambiar la elección. Votos (`votar_reto`): uno por navegador y reto (clave primaria); se guarda el
+SHA-256 del identificador del navegador, no la cookie. Desde el navegador no se lee ni se escribe ninguna
+de las tres tablas (cada persona sí ve sus propios retos); leer un reto por id (`leer_reto`) es lo único
+público. Pruebas: `tests/retos.test.ts`.
+
+**Probarlo a mano** (después de aplicar la migración): jugar un debate con créditos hasta el final, y en la
+consola del navegador `fetch("/api/retos", { method: "POST", body: JSON.stringify({ debate: "<el debate
+que devolvió /api/debate/start>", eleccion: "pro" }) }).then(r => r.json())` → `{ id, creado: true, ruta }`.
+En el SQL Editor: `select * from public.leer_reto('<id>');` muestra el tema y las frases.
 
 ## Comprar créditos (Mercado Pago Checkout Pro)
 
