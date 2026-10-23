@@ -38,6 +38,7 @@ import {
   elegirModeloCreditos,
 } from "@/lib/creditosDebate";
 import { devolverDebate } from "@/lib/creditos";
+import { registrarFrase } from "@/lib/retos";
 import { clienteAdmin } from "@/lib/supabase/admin";
 import type { DebateRole } from "@/types";
 
@@ -225,6 +226,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       content = revision.texto;
     }
 
+    // Debate con créditos: el servidor guarda la frase que acaba de generar (ya revisada). Es la única
+    // fuente de las frases de un reto (POST /api/retos); si no se puede guardar, el turno sigue igual.
+    if (esCreditos && permiso.payload.u) {
+      await guardarFrase({
+        usuario: permiso.payload.u,
+        debate: debateId,
+        indice: turno.indice,
+        rol: role,
+        personalidad: personalidad.id,
+        tema: topic,
+        texto: content,
+      });
+    }
+
     const response: TurnResponse = aviso ? { content, aviso } : { content };
     return NextResponse.json(response);
   } catch (error) {
@@ -286,6 +301,16 @@ async function anularYDevolver(
   } catch (error) {
     console.error("No se pudo devolver el crédito:", error instanceof Error ? error.message : "desconocido");
     return false;
+  }
+}
+
+async function guardarFrase(frase: Parameters<typeof registrarFrase>[1]): Promise<void> {
+  const admin = clienteAdmin();
+  if (!admin) return;
+  try {
+    await registrarFrase(admin, frase);
+  } catch (error) {
+    console.error("No se pudo guardar la frase del reto:", error instanceof Error ? error.message : "desconocido");
   }
 }
 

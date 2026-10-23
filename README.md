@@ -48,6 +48,8 @@ En este modo, en Ajustes, se elige además la **personalidad** del Ángel (clás
 
 Mira **[Cuentas y créditos (docs/cuentas.md)](./docs/cuentas.md)** para la guía completa.
 
+**Retos** (v0.4.0, en construcción): un debate con créditos que terminó se puede guardar como reto (`POST /api/retos`) para que otros voten en `/r/<id>`. El servidor guarda las frases que él mismo generó en cada turno; el navegador solo manda qué personaje eligió. Necesita aplicar la migración `supabase/migrations/20261023000000_retos.sql` (ver [docs/cuentas.md](./docs/cuentas.md#retos)).
+
 ## Variables de entorno
 
 En `.env.local` (desarrollo) o en Vercel (producción). Véase también [docs/cuentas.md](./docs/cuentas.md) para Supabase y Mercado Pago.
