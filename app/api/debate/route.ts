@@ -25,7 +25,7 @@ import {
 
 const MENSAJE_RESPUESTA_CORTADA =
   "El modelo no terminó la frase (se quedó sin espacio). Vuelve a intentarlo o prueba otro modelo.";
-import { MENSAJE_SIN_SECRETO, comprobarTurno, obtenerSecreto, verificarToken } from "@/lib/tokenDebate";
+import { MENSAJE_SIN_SECRETO, comprobarTurno, obtenerSecreto, personalidadDelToken, verificarToken } from "@/lib/tokenDebate";
 import { obtenerRegistroTurnos, type RegistroTurnos } from "@/lib/registroTurnos";
 import { MENSAJE_TEMA_CRITICO, esTemaCritico } from "@/lib/temaCritico";
 import { INSTRUCCION_REHACER, conRevision, revisarFrase } from "@/lib/revisarFrase";
@@ -91,6 +91,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: turno.error }, { status: turno.status });
     }
 
+    // Personalidad: sale del token firmado, nunca del cuerpo del turno.
+    const personalidad = personalidadDelToken(permiso.payload, role);
+    if (!personalidad.ok) {
+      return NextResponse.json({ error: personalidad.error }, { status: 403 });
+    }
+
     // Modo créditos: el debate ya se cobró en /start a la cuenta del token.
     const esCreditos = providerId === PROVEEDOR_CREDITOS;
     if (esCreditos) {
@@ -132,7 +138,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: MENSAJE_TEMA_CRITICO, critico: true }, { status: 422 });
     }
 
-    const systemPrompt = buildSystemPrompt(role);
+    const systemPrompt = buildSystemPrompt(role, personalidad.id);
     const userPrompt = buildUserPrompt(topic, role, phase, history, intervention);
 
     // Genera la frase con el proveedor del turno. No toca el registro ni los créditos: si falla, devuelve
@@ -202,7 +208,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let content = primera.content;
     const aviso = primera.aviso;
 
-    // Segunda barrera: cada frase del Diablo pasa por el revisor antes de mostrarse (lib/revisarFrase.ts).
+    // Segunda barrera: cada frase del Diablo, con cualquier personalidad, pasa por el revisor antes de mostrarse (lib/revisarFrase.ts).
     if (role === "con") {
       const keyRevisor = process.env.OPENROUTER_API_KEY;
       const revision = await conRevision({

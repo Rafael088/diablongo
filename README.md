@@ -44,6 +44,8 @@ Pega tu propia API key de OpenRouter, Google Gemini o Groq (Ollama local solo en
 ### Con créditos
 Solo aparece si las cuentas (Supabase) están configuradas; los créditos se compran con Mercado Pago. Entra con Google o un enlace al correo y juega con modelos de pago que pone el servidor. 1 crédito por debate, que se devuelve si los modelos fallan en mitad del debate. Modelos y costo en `lib/creditosDebate.ts`; paquetes y precios en `lib/paquetes.ts`.
 
+En este modo, en Ajustes, se elige además la **personalidad** del Ángel (clásico, abuela, coach motivacional, abogado, filósofo) y la del Diablo (clásico, ex tóxico, vendedor de cripto, narco de novela, influencer), cada una por separado. La personalidad solo cambia el tono: las reglas de seguridad, la barrera de temas críticos y el revisor de frases del Diablo son las mismas para todas. Catálogo en `lib/personalidades.ts`; el servidor solo acepta personalidades del catálogo, solo en este modo, y las firma en el token del debate.
+
 Mira **[Cuentas y créditos (docs/cuentas.md)](./docs/cuentas.md)** para la guía completa.
 
 ## Variables de entorno

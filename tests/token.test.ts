@@ -63,8 +63,8 @@ describe("firma y verificación", () => {
     if (!r.ok) return;
     expect(r.payload).toEqual(payload);
     expect(r.payload.n).toBe(TOTAL_LLAMADAS);
-    expect(r.payload.pro).toEqual({ pr: "openrouter", mo: modelo });
-    expect(r.payload.con).toEqual({ pr: PROVEEDOR_GRATIS, mo: "" });
+    expect(r.payload.pro).toEqual({ pr: "openrouter", mo: modelo, pe: "angel-clasico" });
+    expect(r.payload.con).toEqual({ pr: PROVEEDOR_GRATIS, mo: "", pe: "diablo-clasico" });
     expect(r.payload.exp - r.payload.iat).toBe(DURACION_TOKEN_MS);
   });
 

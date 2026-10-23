@@ -14,6 +14,8 @@ export interface DebaterConfig {
   model: string;
   apiKey: string;
   name: string;
+  /** Id de lib/personalidades.ts (solo cuenta en modo créditos; si falta, la clásica). */
+  personalidad?: string;
 }
 
 /** Quien escribe un mensaje del historial: un personaje o el usuario. */
