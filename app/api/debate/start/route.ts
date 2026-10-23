@@ -53,7 +53,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       id: ctx.debateId,
       usuario: ctx.usuario,
     });
-    return NextResponse.json({ token, llamadas: TOTAL_LLAMADAS, expira: payload.exp, ...ctx.extra });
+    // `debate` es el id del debate (el mismo que va firmado en el token): con él se crea el reto (POST /api/retos).
+    return NextResponse.json({ token, debate: payload.id, llamadas: TOTAL_LLAMADAS, expira: payload.exp, ...ctx.extra });
   } catch (error) {
     console.error("Debate start error:", error instanceof Error ? error.message : "desconocido");
     // Se cobró pero no se llegó a dar el token: el crédito se devuelve.
