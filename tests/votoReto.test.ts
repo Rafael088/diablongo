@@ -29,7 +29,7 @@ vi.mock("next/headers", () => ({ headers: async () => new Headers({ "user-agent"
 const cuentas = vi.hoisted(() => ({ admin: null as unknown }));
 vi.mock("@/lib/supabase/admin", () => ({ clienteAdmin: () => cuentas.admin }));
 const eventos = vi.hoisted(() => ({ contar: vi.fn(async () => {}) }));
-vi.mock("@/lib/eventosReto", () => ({ contarEventoReto: eventos.contar }));
+vi.mock("@/lib/eventosReto", () => ({ contarEventoReto: eventos.contar, esRastreador: () => false }));
 
 import { POST as VOTAR } from "@/app/api/retos/[id]/voto/route";
 import ContenidoReto from "@/app/r/[id]/contenido";
