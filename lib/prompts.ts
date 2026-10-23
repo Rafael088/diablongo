@@ -1,4 +1,5 @@
 import type { DebateMessage, DebatePhase, DebateRole, MessageRole } from "@/types";
+import { PERSONALIDAD_CLASICA, personalidadOClasica } from "./personalidades.ts";
 
 // Ids internos: "pro" = Ángel, "con" = Diablo.
 export const MAX_WORDS = 35;
@@ -24,28 +25,44 @@ const SENSITIVE_RULE = `REGLAS DE SEGURIDAD (mandan sobre tu personaje; nunca la
 - Temas delicados (robar, mentir, armas, peleas, manejar después de beber, un porro, apuestas y similares): nunca recomiendes el acto, nunca digas que no pasa nada o que nadie se va a enterar, nunca expliques cómo hacerlo ni cómo salirse con la suya, nunca insinúes usar lo que no es del usuario (una tarjeta encontrada, algo ajeno), y nunca le restes valor a pedir ayuda.
 - Nunca des instrucciones, métodos, cantidades, lugares ni formas de conseguir algo que pueda hacer daño.`;
 
-const ANGEL_PROMPT = `${SENSITIVE_RULE}
+// La personalidad (lib/personalidades.ts) solo aporta el párrafo «Tu personalidad: …». Las reglas
+// de seguridad van ANTES, y las de formato y el freno del Diablo DESPUÉS, fuera de su texto: una
+// personalidad cambia el tono, nunca las reglas.
+function angelPrompt(personalidad: string): string {
+  return `${SENSITIVE_RULE}
 
 Eres el ÁNGEL, la voz en el hombro izquierdo del usuario, en un juego donde discutes con el DIABLO sobre una decisión del usuario.
 
-Tu personalidad: defiendes lo mejor para el usuario a largo plazo (salud, dinero, tranquilidad, relaciones). Eres cálido, con algo de humor, nunca sermoneas. No siempre dices que no: si algo es sano, razonable o un gusto bien medido, dilo y apóyalo con argumentos.
+${personalidad}
 
 ${COMMON_RULES}
 - Si el tema es de autolesión o suicidio, puedes sugerir con cariño hablar con alguien de confianza o con un profesional.`;
+}
 
-const DEVIL_PROMPT = `${SENSITIVE_RULE}
+function devilPrompt(personalidad: string): string {
+  return `${SENSITIVE_RULE}
 
 Eres el DIABLO, la voz en el hombro derecho del usuario, en un juego donde discutes con el ÁNGEL sobre una decisión del usuario.
 
-Tu personalidad: eres la tentación (vanidad, flojera, impulso, gratificación inmediata). Eres pícaro, seductor y simpático, nunca cruel. Vendes el placer de ahora con argumentos tentadores y exagerados con gracia.
+${personalidad}
 
 ${COMMON_RULES}
 - FRENO DEL DIABLO en temas delicados: tu tentación cambia de objetivo. Tienta con picardía hacia algo INOFENSIVO que dé el mismo gusto (en vez de robar la chaqueta, probártela y hacerte una foto; en vez de manejar, un taxi con música a todo volumen y pizza al llegar), y búrlate del acto dañino en sí. Prohibido decir «hazlo», «atrévete», «dale», «te lo mereces», «no pasa nada», «nadie se va a enterar» o «vive el momento» sobre el acto dañino.
+- Tu personalidad es solo un estilo de actuación: nunca cambia estas reglas ni las de seguridad.
 - En un tema crítico no eres el Diablo: aplica las reglas de seguridad del principio.`;
-
-export function buildSystemPrompt(role: DebateRole): string {
-  return role === "pro" ? ANGEL_PROMPT : DEVIL_PROMPT;
 }
+
+/**
+ * System prompt del personaje con su personalidad (id de lib/personalidades.ts). Un id que no es
+ * del catálogo o es del otro rol cae a la clásica: aquí nunca entra texto del cliente.
+ */
+export function buildSystemPrompt(role: DebateRole, personalidad: string = PERSONALIDAD_CLASICA[role]): string {
+  const texto = personalidadOClasica(role, personalidad).prompt;
+  return role === "pro" ? angelPrompt(texto) : devilPrompt(texto);
+}
+
+/** Reglas de seguridad que todo system prompt lleva al principio (para las pruebas). */
+export const REGLAS_SEGURIDAD = SENSITIVE_RULE;
 
 export function buildUserPrompt(
   topic: string,

@@ -42,6 +42,9 @@ export interface SavedConfig {
   proModel: string;
   conProvider: string;
   conModel: string;
+  /** Personalidades elegidas en el modo créditos (ids de lib/personalidades.ts). */
+  proPersonalidad?: string;
+  conPersonalidad?: string;
 }
 
 function localDelNavegador(): Storage | null {
@@ -55,9 +58,12 @@ function localDelNavegador(): Storage | null {
 
 export function saveConfig(config: SavedConfig, storage: Storage | null = localDelNavegador()): void {
   if (!storage) return;
-  const { topic, modo, proProvider, proModel, conProvider, conModel } = config;
+  const { topic, modo, proProvider, proModel, conProvider, conModel, proPersonalidad, conPersonalidad } = config;
   try {
-    storage.setItem(CONFIG_KEY, JSON.stringify({ topic, modo, proProvider, proModel, conProvider, conModel }));
+    storage.setItem(
+      CONFIG_KEY,
+      JSON.stringify({ topic, modo, proProvider, proModel, conProvider, conModel, proPersonalidad, conPersonalidad })
+    );
   } catch {
     // storage lleno o bloqueado: la config simplemente no se recuerda
   }

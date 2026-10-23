@@ -112,8 +112,8 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         topic: config.topic,
-        pro: { provider: config.pro.provider, model: config.pro.model },
-        con: { provider: config.con.provider, model: config.con.model },
+        pro: { provider: config.pro.provider, model: config.pro.model, personalidad: config.pro.personalidad },
+        con: { provider: config.con.provider, model: config.con.model, personalidad: config.con.personalidad },
         turnstile: verificacion,
       }),
     });

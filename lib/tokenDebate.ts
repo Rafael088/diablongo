@@ -2,6 +2,8 @@ import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import type { DebatePhase, DebateRole } from "../types/index.ts";
 import { TOTAL_LLAMADAS, TOTAL_TURNS, TURN_PLAN } from "./debateEngine.ts";
 import { esObjeto, validarProveedorModelo, validarTema } from "./validarTurno.ts";
+import { PROVEEDOR_CREDITOS } from "./creditosDebate.ts";
+import { PERSONALIDAD_CLASICA, personalidadDe, validarPersonalidad } from "./personalidades.ts";
 
 /*
  * TOKEN DEL DEBATE: se cuentan debates, no llamadas.
@@ -16,7 +18,9 @@ import { esObjeto, validarProveedorModelo, validarTema } from "./validarTurno.ts
  * (proveedor y modelo de cada personaje; el modelo es "" en modo gratis), n
  * (llamadas permitidas = TOTAL_LLAMADAS = 8 turnos + 1 desenlace), iat/exp (ms)
  * y, solo en modo créditos, u (UUID de la cuenta que pagó: a quién devolver).
- * Nunca lleva la clave de API.
+ * Cada personaje lleva además pe (id de su personalidad, lib/personalidades.ts):
+ * /api/debate la toma de aquí, nunca del cliente. Un token sin pe (emitido antes
+ * de la v0.4.0) juega con la clásica. Nunca lleva la clave de API.
  *
  * El token es reutilizable por sí solo, así que cada turno manda además su
  * `indice` (0..8). /api/debate exige que el índice esté en el plan, que
@@ -44,6 +48,8 @@ export interface ProveedorRol {
   pr: string;
   /** modelo ("" en modo gratis: lo decide el servidor) */
   mo: string;
+  /** personalidad (id de lib/personalidades.ts); falta en tokens viejos = clásica */
+  pe?: string;
 }
 
 export interface PayloadToken {
@@ -62,8 +68,8 @@ export interface PayloadToken {
 /** Configuración del debate que llega a /start (sin claves). */
 export interface ConfigInicio {
   topic: string;
-  pro: { provider: string; model: string };
-  con: { provider: string; model: string };
+  pro: { provider: string; model: string; personalidad?: string };
+  con: { provider: string; model: string; personalidad?: string };
 }
 
 // ---------------------------------------------------------------- secreto
@@ -128,8 +134,8 @@ export function emitirToken(
     v: VERSION_TOKEN,
     id,
     th: huellaTema(secreto, id, config.topic),
-    pro: { pr: config.pro.provider, mo: config.pro.model },
-    con: { pr: config.con.provider, mo: config.con.model },
+    pro: { pr: config.pro.provider, mo: config.pro.model, pe: config.pro.personalidad ?? PERSONALIDAD_CLASICA.pro },
+    con: { pr: config.con.provider, mo: config.con.model, pe: config.con.personalidad ?? PERSONALIDAD_CLASICA.con },
     n: TOTAL_LLAMADAS,
     iat: ahora,
     exp: ahora + DURACION_TOKEN_MS,
@@ -138,9 +144,10 @@ export function emitirToken(
   return { token: firmarPayload(payload, secreto), payload };
 }
 
-function esProveedorRol(x: unknown): x is ProveedorRol {
+function esProveedorRol(x: unknown, rol: DebateRole): x is ProveedorRol {
   return (
     esObjeto(x) &&
+    (x.pe === undefined || personalidadDe(rol, x.pe) !== undefined) &&
     typeof x.pr === "string" &&
     x.pr.length > 0 &&
     x.pr.length <= 64 &&
@@ -163,8 +170,8 @@ function esPayload(x: unknown): x is PayloadToken {
     typeof x.th === "string" &&
     x.th.length === 43 &&
     B64URL.test(x.th) &&
-    esProveedorRol(x.pro) &&
-    esProveedorRol(x.con) &&
+    esProveedorRol(x.pro, "pro") &&
+    esProveedorRol(x.con, "con") &&
     esEntero(x.n) &&
     x.n >= 1 &&
     x.n <= TOTAL_LLAMADAS &&
@@ -211,24 +218,28 @@ export function verificarToken(token: unknown, secreto: Buffer, ahora = Date.now
 export type ResultadoInicio = { ok: true; config: ConfigInicio } | { ok: false; error: string };
 
 /**
- * Cuerpo de /api/debate/start: { topic, pro: {provider, model}, con: {provider, model} }.
+ * Cuerpo de /api/debate/start: { topic, pro: {provider, model, personalidad?}, con: {...} }.
  * Mismas reglas que cada turno (validarTema y validarProveedorModelo de
  * lib/validarTurno.ts). Las claves de API no se piden ni se guardan aquí.
+ * La personalidad (lib/personalidades.ts) falta = clásica; fuera del catálogo o de otro
+ * rol, 400; distinta de la clásica solo si ese personaje juega con créditos.
  */
 export function validarInicio(body: unknown, ...args: [entorno?: string]): ResultadoInicio {
   if (!esObjeto(body)) return { ok: false, error: "El cuerpo de la petición no es válido." };
   const tema = validarTema(body.topic);
   if (!tema.ok) return tema;
-  const roles: Record<DebateRole, { provider: string; model: string }> = {
-    pro: { provider: "", model: "" },
-    con: { provider: "", model: "" },
+  const roles: Record<DebateRole, { provider: string; model: string; personalidad: string }> = {
+    pro: { provider: "", model: "", personalidad: PERSONALIDAD_CLASICA.pro },
+    con: { provider: "", model: "", personalidad: PERSONALIDAD_CLASICA.con },
   };
   for (const rol of ["pro", "con"] as const) {
     const d = body[rol];
     if (!esObjeto(d)) return { ok: false, error: "Falta la configuración de un personaje." };
     const prov = validarProveedorModelo(d.provider, d.model, ...args);
     if (!prov.ok) return prov;
-    roles[rol] = { provider: prov.provider.id, model: prov.model };
+    const pe = validarPersonalidad(rol, d.personalidad, prov.provider.id === PROVEEDOR_CREDITOS);
+    if (!pe.ok) return pe;
+    roles[rol] = { provider: prov.provider.id, model: prov.model, personalidad: pe.id };
   }
   return { ok: true, config: { topic: tema.topic, ...roles } };
 }
@@ -270,4 +281,16 @@ export function comprobarTurno(
     return { ok: false, status: 403, error: "Este debate se empezó con otro proveedor o modelo." };
   }
   return { ok: true, indice };
+}
+
+/**
+ * Personalidad con la que juega ese personaje, leída del token ya verificado. Sin créditos solo
+ * existe la clásica: si un token dijera otra cosa (no debería: /start no lo firma), se rechaza.
+ */
+export function personalidadDelToken(
+  payload: PayloadToken,
+  rol: DebateRole
+): { ok: true; id: string } | { ok: false; error: string } {
+  const delRol = payload[rol];
+  return validarPersonalidad(rol, delRol.pe, delRol.pr === PROVEEDOR_CREDITOS);
 }

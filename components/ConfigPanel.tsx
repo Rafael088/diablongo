@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { proveedoresDisponibles, getProviderById } from "@/lib/providers";
-import { DebateConfig, DebaterConfig, ProviderConfig } from "@/types";
+import { DebateConfig, DebaterConfig, DebateRole, ProviderConfig } from "@/types";
 import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
 import { Settings2, Eye, EyeOff } from "lucide-react";
 import Logo from "@/components/Logo";
@@ -29,6 +29,7 @@ import Cuenta from "./Cuenta";
 import { configSupabase } from "@/lib/supabase/config";
 import { CREDITOS_POR_DEBATE } from "@/lib/creditosDebate";
 import { textoCreditos } from "@/lib/cuenta";
+import { PERSONALIDAD_CLASICA, PERSONALIDADES, personalidadOClasica } from "@/lib/personalidades";
 
 // «Con créditos» solo existe si hay cuentas (Supabase configurado).
 const HAY_CUENTAS = configSupabase() !== null;
@@ -91,6 +92,10 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
 
   const [conProvider, setConProvider] = useState(proveedorValido(saved?.conProvider, disponibles));
   const [conModelRaw, setConModel] = useState(saved?.conModel ?? porDefecto.models[1]);
+
+  // Personalidades: solo se eligen (y solo se envían) en «Con créditos»; en el resto, la clásica.
+  const [proPersonalidad, setProPersonalidad] = useState(() => personalidadOClasica("pro", saved?.proPersonalidad).id);
+  const [conPersonalidad, setConPersonalidad] = useState(() => personalidadOClasica("con", saved?.conPersonalidad).id);
 
   // Una key por proveedor (si Ángel y Diablo usan el mismo, comparten key).
   const [keys, setKeys] = useState<Record<string, string>>(() =>
@@ -187,6 +192,8 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
       proModel,
       conProvider,
       conModel,
+      proPersonalidad,
+      conPersonalidad,
     });
     for (const id of gratis ? [] : new Set(idsKey)) {
       if (getProviderById(id)?.requiresApiKey) {
@@ -200,6 +207,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
       model: gratis ? "" : proModel,
       apiKey: gratis ? "" : proApiKey,
       name: "PRO",
+      personalidad: modo === "creditos" ? proPersonalidad : PERSONALIDAD_CLASICA.pro,
     };
 
     const con: DebaterConfig = {
@@ -208,6 +216,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
       model: gratis ? "" : conModel,
       apiKey: gratis ? "" : conApiKey,
       name: "CON",
+      personalidad: modo === "creditos" ? conPersonalidad : PERSONALIDAD_CLASICA.con,
     };
 
     onStart({ topic: topic.trim(), pro, con }, tokenTurnstile ?? undefined);
@@ -303,6 +312,13 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
           </p>
         )}
 
+        {modo === "creditos" && (
+          <>
+            <SelectorPersonalidad rol="pro" valor={proPersonalidad} onChange={setProPersonalidad} />
+            <SelectorPersonalidad rol="con" valor={conPersonalidad} onChange={setConPersonalidad} />
+          </>
+        )}
+
         {modo === "openrouter" && (
           <ConexionOpenRouter
             conectado={conectado}
@@ -363,6 +379,28 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
         </p>
       </PanelAjustes>
     </>
+  );
+}
+
+/** Personalidad de un personaje (solo en «Con créditos»). El servidor vuelve a validarla. */
+function SelectorPersonalidad(props: { rol: DebateRole; valor: string; onChange: (id: string) => void }) {
+  const { rol, valor, onChange } = props;
+  const idCampo = `personalidad-${rol}`;
+  const elegida = personalidadOClasica(rol, valor);
+  return (
+    <div className={`config-seccion config-seccion-${rol}`}>
+      <label htmlFor={idCampo} className="config-seccion-titulo">
+        {rol === "pro" ? "Personalidad del Ángel" : "Personalidad del Diablo"}
+      </label>
+      <select id={idCampo} value={elegida.id} onChange={(e) => onChange(e.target.value)} className="config-campo">
+        {PERSONALIDADES[rol].map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.nombre}
+          </option>
+        ))}
+      </select>
+      <p className="config-nota">{elegida.descripcion}</p>
+    </div>
   );
 }
 
