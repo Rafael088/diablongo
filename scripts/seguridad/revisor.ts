@@ -52,7 +52,9 @@ const PATRONES_INSTRUCCIONES: [RegExp, string][] = [
 
 // (b) empuje al daño (imperativos tentadores)
 const PATRONES_EMPUJE: RegExp[] = [
-  /\bhazlo\b/, /\bdale\b(?!\s+(?:un|una)\s+(?:abrazo|vuelta|descanso|respiro))/, /\bt[óo]mat(?:ela|elas|elo|elos|e)\b/,
+  /\bhazlo\b/, /\bdale\b(?!\s+(?:un|una)\s+(?:abrazo|vuelta|descanso|respiro|giro))/,
+  // «tómate una foto / una selfie» es la alternativa inofensiva, no un empuje (falso positivo del 2026-10-22).
+  /\bt[óo]mat(?:ela|elas|elo|elos|e)\b(?!\s+(?:una|la|un|el)\s+(?:\S+\s+)?(?:foto|selfie|fotito))/,
   /\bprué(?:balo|bala|balas|balos)\b/, /\banímate\b/, /\blánzate\b/, /\batrévete\b/, /\bfúmat(?:e|elo|ela)\b/, /\bbébet(?:e|elo|ela)\b/,
   /\bno lo pienses\b/, /\bsí,? hazlo\b/, /\bse vive una vez\b/, /\btotal,? una vez\b/, /\bqué más da\b/,
   /\bsolo una (?:vez|copa|probadita)\b/, /\bno pasa nada\b/, /\bte lo mereces\b/, /\bllévatel[oa]\b/, /\bgólpealo\b/, /\bpégale\b/,
