@@ -20,6 +20,7 @@ import { MINIMO, TOPE, quienGana, textoGanando, valorDeVotos, type Ganando } fro
 import TarjetaDesenlace from "./TarjetaDesenlace";
 import { teclaAvanza } from "@/lib/avance";
 import { MAX_INTERVENCION } from "@/lib/topes";
+import { esClasica, nombreVisible, personalidadOClasica } from "@/lib/personalidades";
 
 interface DebateArenaProps {
   config: DebateConfig;
@@ -54,12 +55,6 @@ const ELECCION: Record<"pro" | "con", { titulo: string; detalle: string }> = {
   con: { titulo: "Dale al diablongo", detalle: "(La vida es corta)" },
 };
 
-const NOMBRES: Record<DebateRole | "user", string> = {
-  pro: "Ángel",
-  con: "Diablo",
-  user: "Tú",
-};
-
 const PERSONAJE: Record<DebateRole | "user", PersonajeSprite> = {
   pro: "pro",
   con: "con",
@@ -83,6 +78,15 @@ export default function DebateArena({
   desenlaceInicial,
   volcadoTarjeta = false,
 }: DebateArenaProps) {
+  // Personalidad elegida de cada personaje (en modo gratis la config trae la clásica): su sprite y su nombre.
+  const idPersonalidad: Record<DebateRole, string | undefined> = { pro: config.pro.personalidad, con: config.con.personalidad };
+  const NOMBRES: Record<DebateRole | "user", string> = {
+    pro: nombreVisible("pro", idPersonalidad.pro),
+    con: nombreVisible("con", idPersonalidad.con),
+    user: "Tú",
+  };
+  // «el Ángel» / «el Diablo» (clásicos) o «Abuela» (las demás): para frases con «al».
+  const alNombre = (r: DebateRole) => (esClasica(r, personalidadOClasica(r, idPersonalidad[r]).id) ? `al ${NOMBRES[r]}` : `a ${NOMBRES[r]}`);
   const debate = useDebate(config, { generate, initialMessages, initialStatus, persist, turnstile });
   const { messages, status, thinking, error, aviso, textRead, esperandoSiguiente, siguiente } = debate;
   const [interventionText, setInterventionText] = useState("");
@@ -211,7 +215,7 @@ export default function DebateArena({
     const r = messages[i]?.role === "con" ? "con" : "pro";
     return votos.includes(i)
       ? `Ya diste 👍 a ${NOMBRES[r]}`
-      : `Dar 👍 a esta frase: apoyas al ${NOMBRES[r]}`;
+      : `Dar 👍 a esta frase: apoyas ${alNombre(r)}`;
   };
   const ultimoIdx = messages.length - 1;
   const mostrarVoto =
@@ -264,6 +268,7 @@ export default function DebateArena({
             personaje={PERSONAJE[quien]}
             fotograma={quien === "user" ? frameUsuario : frameDe(quien)}
             nombre={NOMBRES[quien]}
+            personalidad={quien === "user" ? undefined : idPersonalidad[quien]}
             claseNombre={`arena-nombre-${quien}`}
             activo={
               ganadorFinal
@@ -332,12 +337,12 @@ export default function DebateArena({
                       onClick={() => elegir(quien)}
                       aria-label={
                         ganando === quien
-                          ? `Hacer caso al ${NOMBRES[quien]} (iba ganando en la barra)`
-                          : `Hacer caso al ${NOMBRES[quien]}`
+                          ? `Hacer caso ${alNombre(quien)} (iba ganando en la barra)`
+                          : `Hacer caso ${alNombre(quien)}`
                       }
                     >
                       <span aria-hidden>
-                        <PixelSprite personaje={quien} fotograma="victoria" escala={1.5} />
+                        <PixelSprite personaje={quien} fotograma="victoria" escala={1.5} personalidad={idPersonalidad[quien]} />
                       </span>
                       <span>
                         <span className="eleccion-titulo">{ELECCION[quien].titulo}</span>
@@ -437,6 +442,8 @@ export default function DebateArena({
             tema={config.topic}
             desenlace={desenlace}
             ganador={eleccion}
+            personalidad={idPersonalidad[eleccion]}
+            nombre={NOMBRES[eleccion]}
             onJugarOtra={handleReset}
             volcado={volcadoTarjeta}
           />

@@ -229,6 +229,9 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .config-iniciar:hover:not(:disabled) { background: var(--color-acento); }
 .config-iniciar:disabled { background: var(--color-superficie); color: var(--color-texto-suave); cursor: not-allowed; }
+.config-personalidad { display: flex; align-items: center; gap: 12px; }
+.config-personalidad-vista { flex: none; width: 64px; height: 64px; background: var(--color-superficie); border: 2px solid var(--color-borde-suave); }
+.config-personalidad .config-campo { flex: 1; min-width: 0; }
 .config-nota { text-align: center; color: var(--color-texto-suave); font-size: 1rem; }
 
 @media (prefers-reduced-motion: reduce) {

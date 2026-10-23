@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DebateArena from "@/components/DebateArena";
+import { personalidadOClasica } from "@/lib/personalidades";
 import { TURN_PLAN } from "@/lib/debateEngine";
 import type { DebateConfig, DebateMessage } from "@/types";
 import type { GenerateTurn } from "@/hooks/useDebate";
@@ -93,10 +94,16 @@ function Demo() {
   const votosIniciales = congelada
     ? indicesDeVotos(votosParam, mensajesHasta(turnoFinal))
     : undefined;
+  // ?pro=angel-abuela&con=diablo-narco: personalidades en la demo (ids del catálogo; uno desconocido = clásico).
+  const configDemo: DebateConfig = {
+    ...config,
+    pro: { ...config.pro, personalidad: personalidadOClasica("pro", params.get("pro")).id },
+    con: { ...config.con, personalidad: personalidadOClasica("con", params.get("con")).id },
+  };
   return (
     <DebateArena
-      key={congelada ? `${turnoFinal}${ganador ?? ""}${golpeFijo ?? ""}${votosParam ?? ""}${final ?? ""}` : "viva"}
-      config={config}
+      key={`${configDemo.pro.personalidad}${configDemo.con.personalidad}${congelada ? `${turnoFinal}${ganador ?? ""}${golpeFijo ?? ""}${votosParam ?? ""}${final ?? ""}` : "viva"}`}
+      config={configDemo}
       onReset={() => router.push("/arena-demo")}
       generate={generate}
       persist={false}

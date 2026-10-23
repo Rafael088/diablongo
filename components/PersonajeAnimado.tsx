@@ -10,6 +10,8 @@ interface PersonajeAnimadoProps {
   personaje: PersonajeSprite;
   fotograma: FotogramaSprite;
   nombre: string;
+  /** Id de personalidad del catálogo (solo Ángel y Diablo); sin él, el clásico. */
+  personalidad?: string;
   claseNombre: string;
   activo: boolean;
   /** Desfase de la flotación, en segundos, para que no suban a la vez. */
@@ -64,6 +66,7 @@ export default function PersonajeAnimado({
   personaje,
   fotograma,
   nombre,
+  personalidad,
   claseNombre,
   activo,
   desfase = 0,
@@ -113,6 +116,7 @@ export default function PersonajeAnimado({
               personaje={personaje}
               fotograma={fotograma}
               escala={4}
+              personalidad={personalidad}
               className="w-full h-auto"
             />
           </motion.div>

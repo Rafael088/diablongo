@@ -34,6 +34,22 @@ export const PALETA_SPRITES = {
   D: "#4a2d20", // pelo castano sombra
   j: "#3b3d52", // pantalon
   z: "#8fd3ff", // gota de sudor / idea
+  // Colores de las variantes de personalidad (lib/sprites/variantes.ts). Los sprites base no los usan.
+  L: "#e8e6ef", // pelo canoso / barba
+  l: "#b3afc7", // canoso sombra
+  P: "#d0618f", // chal rosa
+  Q: "#98385f", // chal sombra
+  q: "#5a3a22", // marco de gafas / cuero oscuro
+  o: "#9a6a35", // madera, maletín
+  n: "#4ade80", // verde neón (lentes cripto, laurel claro)
+  N: "#1f8f4e", // verde oscuro (laurel)
+  u: "#2f6fd0", // azul (corbata, gorra)
+  U: "#1d478f", // azul sombra
+  i: "#ff3b6b", // corazón
+  T: "#e3c487", // sombrero de paja claro
+  M: "#a8823f", // sombrero sombra / cadena vieja
+  K: "#2d2d3a", // negro suave (sombrero, celular)
+  O: "#ff9f1c", // naranja (silbato, gorra coach)
 } as const satisfies Record<string, `#${string}`>;
 
 export type CaracterPaleta = keyof typeof PALETA_SPRITES;

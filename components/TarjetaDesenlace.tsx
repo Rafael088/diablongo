@@ -9,6 +9,7 @@ import {
   descargarCanvas,
 } from "@/lib/descargaTarjeta";
 import { TOKENS } from "@/lib/paleta";
+import { esClasica, nombreVisible, personalidadOClasica } from "@/lib/personalidades";
 import { TAMANO_SPRITE, matrizDe, rectsDeMatriz } from "@/lib/sprites";
 
 export const TARJETA_ANCHO = 1080;
@@ -44,7 +45,13 @@ async function cargarFuentes(f: Fuentes, textos: string[]): Promise<void> {
 }
 
 const ACENTO: Record<Bando, string> = { pro: C["--color-angel"], con: C["--color-diablo"] };
-const ETIQUETA: Record<Bando, string> = { pro: "Ganó el Ángel", con: "Ganó el Diablo" };
+const ETIQUETA_CLASICA: Record<Bando, string> = { pro: "Ganó el Ángel", con: "Ganó el Diablo" };
+
+/** «Ganó el Ángel» con la clásica; «Ganó Abuela» (el nombre visible de la personalidad) con las demás. */
+export function etiquetaGanador(ganador: Bando, personalidad?: string, nombre?: string): string {
+  const visible = nombre ?? nombreVisible(ganador, personalidad);
+  return esClasica(ganador, personalidadOClasica(ganador, personalidad).id) ? ETIQUETA_CLASICA[ganador] : `Ganó ${visible}`;
+}
 
 /** Parte el texto en líneas que caben en `ancho` píxeles. */
 function envolver(ctx: CanvasRenderingContext2D, texto: string, ancho: number): string[] {
@@ -68,6 +75,8 @@ function pintarTarjeta(
   f: Fuentes,
   tema: string, desenlace: string,
   ganador: Bando,
+  personalidad: string | undefined,
+  etiqueta: string,
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -104,15 +113,22 @@ function pintarTarjeta(
   ctx.lineWidth = 8;
   ctx.strokeRect(x0 - 20, y0 - 20, lado + 40, lado + 40);
   ctx.imageSmoothingEnabled = false;
-  for (const r of rectsDeMatriz(matrizDe(ganador, "victoria"))) {
+  for (const r of rectsDeMatriz(matrizDe(ganador, "victoria", personalidad))) {
     ctx.fillStyle = r.color;
     ctx.fillRect(x0 + r.x * escala, y0 + r.y * escala, r.ancho * escala, escala);
   }
 
   // Quién ganó y el desenlace.
   ctx.fillStyle = acento;
-  ctx.font = `38px ${f.titulo}`;
-  ctx.fillText(ETIQUETA[ganador].toUpperCase(), centro, 1045);
+  // Los nombres largos («Ganó Vendedor de cripto») se encogen hasta caber dentro del borde.
+  const textoGanador = etiqueta.toUpperCase();
+  let tamanoGanador = 38;
+  ctx.font = `${tamanoGanador}px ${f.titulo}`;
+  while (tamanoGanador > 20 && ctx.measureText(textoGanador).width > 840) {
+    tamanoGanador -= 2;
+    ctx.font = `${tamanoGanador}px ${f.titulo}`;
+  }
+  ctx.fillText(textoGanador, centro, 1045);
   ctx.fillStyle = C["--color-texto"];
   ctx.font = `46px ${f.dialogo}`;
   const lineas = envolver(ctx, desenlace, 840).slice(0, 4);
@@ -139,6 +155,10 @@ interface TarjetaDesenlaceProps {
   tema: string;
   desenlace: string;
   ganador: Bando;
+  /** Id de personalidad del ganador (sprite y nombre en la tarjeta); sin él, el clásico. */
+  personalidad?: string;
+  /** Nombre visible del ganador; por defecto el del catálogo. */
+  nombre?: string;
   onJugarOtra: () => void;
   /** Capturas: escribe el PNG real en un <output> para sacarlo con --dump-dom. */
   volcado?: boolean;
@@ -148,9 +168,12 @@ export default function TarjetaDesenlace({
   tema,
   desenlace,
   ganador,
+  personalidad,
+  nombre,
   onJugarOtra,
   volcado = false,
 }: TarjetaDesenlaceProps) {
+  const etiqueta = etiquetaGanador(ganador, personalidad, nombre);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const volcadoRef = useRef<HTMLOutputElement>(null);
   const compartir = useSyncExternalStore(sinSuscripcion, puedeCompartirArchivos, () => false);
@@ -165,16 +188,16 @@ export default function TarjetaDesenlace({
     setError(null);
     const fuentes = leerFuentes();
     // Hasta que las fuentes carguen no se pinta: así el PNG nunca sale con la tipografía de reserva.
-    void cargarFuentes(fuentes, [tema, desenlace, ETIQUETA[ganador], MARCA_TARJETA, "* TU DECISIÓN"]).then(() => {
+    void cargarFuentes(fuentes, [tema, desenlace, etiqueta, MARCA_TARJETA, "* TU DECISIÓN"]).then(() => {
       if (!vigente) return;
-      pintarTarjeta(canvas, fuentes, tema, desenlace, ganador);
+      pintarTarjeta(canvas, fuentes, tema, desenlace, ganador, personalidad, etiqueta);
       if (volcado && volcadoRef.current) volcadoRef.current.textContent = canvas.toDataURL("image/png");
       setLista(true);
     });
     return () => {
       vigente = false;
     };
-  }, [tema, desenlace, ganador, volcado]);
+  }, [tema, desenlace, ganador, personalidad, etiqueta, volcado]);
 
   const descargar = async () => {
     setError(null);

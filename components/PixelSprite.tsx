@@ -1,3 +1,4 @@
+import { nombreVisible } from "@/lib/personalidades";
 import {
   NOMBRE_PERSONAJE,
   TAMANO_SPRITE,
@@ -12,6 +13,8 @@ interface PixelSpriteProps {
   fotograma?: FotogramaSprite;
   /** Píxeles de pantalla por píxel del sprite (4 → 128×128). */
   escala?: number;
+  /** Id de personalidad del catálogo: pinta su variante (accesorio y paleta). Sin él, el sprite clásico. */
+  personalidad?: string;
   className?: string;
 }
 
@@ -20,9 +23,10 @@ export default function PixelSprite({
   personaje,
   fotograma = "reposo",
   escala = 4,
+  personalidad,
   className,
 }: PixelSpriteProps) {
-  const rects = rectsDeMatriz(matrizDe(personaje, fotograma));
+  const rects = rectsDeMatriz(matrizDe(personaje, fotograma, personalidad));
   const lado = TAMANO_SPRITE * escala;
   return (
     <svg
@@ -31,7 +35,7 @@ export default function PixelSprite({
       viewBox={`0 0 ${TAMANO_SPRITE} ${TAMANO_SPRITE}`}
       shapeRendering="crispEdges"
       role="img"
-      aria-label={`${NOMBRE_PERSONAJE[personaje]} (${fotograma})`}
+      aria-label={`${personaje === "usuario" ? NOMBRE_PERSONAJE[personaje] : nombreVisible(personaje, personalidad)} (${fotograma})`}
       className={className}
     >
       {rects.map((r) => (
