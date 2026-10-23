@@ -26,6 +26,7 @@ import {
 import TurnstileWidget from "./TurnstileWidget";
 import PanelAjustes from "./PanelAjustes";
 import Cuenta from "./Cuenta";
+import MisRetos from "./MisRetos";
 import { configSupabase } from "@/lib/supabase/config";
 import { CREDITOS_POR_DEBATE } from "@/lib/creditosDebate";
 import { textoCreditos } from "@/lib/cuenta";
@@ -373,6 +374,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
         </p>
 
         <Cuenta />
+        <MisRetos />
 
         <p className="ajustes-legal">
           <Link href="/terminos">Términos y condiciones</Link>
