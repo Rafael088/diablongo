@@ -59,10 +59,19 @@ interface TurnstileWidgetProps {
   sitekey: string;
   /** Token nuevo, o null cuando caduca o falla (de un solo uso: el padre lo descarta al usarlo). */
   onToken: (token: string | null) => void;
+  /** Acción que firma el token (por defecto «iniciar-debate»; el voto de un reto usa ACCION_TURNSTILE_VOTO). */
+  accion?: string;
+  /** Texto de ayuda sobre el widget. */
+  ayuda?: string;
 }
 
-/** Widget de Cloudflare Turnstile (tema oscuro, tamaño flexible, acción «iniciar-debate»). */
-export default function TurnstileWidget({ sitekey, onToken }: TurnstileWidgetProps) {
+/** Widget de Cloudflare Turnstile (tema oscuro, tamaño flexible, acción «iniciar-debate» salvo que se pida otra). */
+export default function TurnstileWidget({
+  sitekey,
+  onToken,
+  accion = ACCION_TURNSTILE,
+  ayuda = "Comprobación de seguridad de Cloudflare: confirma que eres una persona antes de empezar.",
+}: TurnstileWidgetProps) {
   const contenedor = useRef<HTMLDivElement>(null);
   const [estado, setEstado] = useState<"cargando" | "listo" | "fallo">("cargando");
   const [intento, setIntento] = useState(0);
@@ -81,7 +90,7 @@ export default function TurnstileWidget({ sitekey, onToken }: TurnstileWidgetPro
         api = turnstile;
         id = turnstile.render(contenedor.current, {
           sitekey,
-          action: ACCION_TURNSTILE,
+          action: accion,
           theme: "dark",
           size: "flexible",
           callback: (token) => onTokenRef.current(token),
@@ -98,7 +107,7 @@ export default function TurnstileWidget({ sitekey, onToken }: TurnstileWidgetPro
       cancelado = true;
       if (id && api) api.remove(id);
     };
-  }, [sitekey, intento]);
+  }, [sitekey, accion, intento]);
 
   const reintentar = () => {
     setEstado("cargando");
@@ -108,7 +117,7 @@ export default function TurnstileWidget({ sitekey, onToken }: TurnstileWidgetPro
   return (
     <div>
       <p id="turnstile-ayuda" className="text-sm opacity-70 mb-2">
-        Comprobación de seguridad de Cloudflare: confirma que eres una persona antes de empezar.
+        {ayuda}
       </p>
       <div
         ref={contenedor}
