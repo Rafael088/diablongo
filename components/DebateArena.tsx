@@ -18,6 +18,8 @@ import type { FotogramaSprite, PersonajeSprite } from "@/lib/sprites";
 import PersonajeAnimado from "./PersonajeAnimado";
 import { MINIMO, TOPE, quienGana, textoGanando, valorDeVotos, type Ganando } from "@/lib/tentacion";
 import TarjetaDesenlace from "./TarjetaDesenlace";
+import BotonReto from "./BotonReto";
+import { PROVEEDOR_CREDITOS } from "@/lib/creditosDebate";
 import { teclaAvanza } from "@/lib/avance";
 import { MAX_INTERVENCION } from "@/lib/topes";
 import { esClasica, nombreVisible, personalidadOClasica } from "@/lib/personalidades";
@@ -463,6 +465,9 @@ export default function DebateArena({
             onJugarOtra={handleReset}
             volcado={volcadoTarjeta}
           />
+          {config.pro.provider === PROVEEDOR_CREDITOS && !generate && debate.debateId && (
+            <BotonReto debate={debate.debateId} eleccion={eleccion} />
+          )}
           <div className="marcador-contenedor">
             <div className="marcador-box">
               <div className="marcador-puntos">

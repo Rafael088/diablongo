@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import { esObjeto } from "@/lib/validarTurno";
 import { MAX_CUERPO_BYTES } from "@/lib/topes";
 import {
@@ -8,6 +8,7 @@ import {
   MENSAJE_RETO_SIN_SESION,
   MENSAJE_RETO_SIN_TERMINAR,
   crearReto,
+  retosDeUsuario,
   validarEleccion,
 } from "@/lib/retos";
 import { clienteServidor } from "@/lib/supabase/servidor";
@@ -61,6 +62,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ id: r.id, creado: r.creado, ruta: `/r/${r.id}` }, { status: r.creado ? 201 : 200 });
   } catch (error) {
     console.error("Retos error:", error instanceof Error ? error.message : "desconocido");
+    return NextResponse.json({ error: MENSAJE_RETO_NO_DISPONIBLE }, { status: 503 });
+  }
+}
+
+/** GET /api/retos: los retos de la persona con sesión, del más nuevo al más viejo, con sus votos. */
+export async function GET(): Promise<NextResponse> {
+  await connection();
+  try {
+    const sesion = await clienteServidor();
+    const admin = clienteAdmin();
+    if (!sesion || !admin) return NextResponse.json({ error: MENSAJE_RETO_NO_DISPONIBLE }, { status: 503 });
+    const { data, error } = await sesion.auth.getUser();
+    if (error || !data.user) return NextResponse.json({ error: MENSAJE_RETO_SIN_SESION }, { status: 401 });
+    const retos = await retosDeUsuario(admin, data.user.id, 50);
+    return NextResponse.json({ retos }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    console.error("Retos lista error:", error instanceof Error ? error.message : "desconocido");
     return NextResponse.json({ error: MENSAJE_RETO_NO_DISPONIBLE }, { status: 503 });
   }
 }

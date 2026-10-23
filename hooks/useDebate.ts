@@ -60,6 +60,8 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Id del debate (campo `debate` de /api/debate/start): con él se crea el reto. Null en demo y repetición.
+  const [debateId, setDebateId] = useState<string | null>(null);
   // Tema crítico (lib/temaCritico.ts): la arena cambia el debate por la pantalla de ayuda.
   const [ayuda, setAyuda] = useState(false);
   // Frase leída y turno siguiente retenido hasta que la persona pulse «Siguiente».
@@ -125,6 +127,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
       throw new Error(data.error || `Error ${response.status}`);
     }
     tokenRef.current = data.token;
+    setDebateId(typeof data.debate === "string" ? data.debate : null);
     return data.token;
   }, [config]);
 
@@ -368,5 +371,5 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
     [config, generate]
   );
 
-  return { messages, status, thinking, error, aviso, ayuda, esperandoSiguiente, siguiente, play, pause, intervene, textRead, stop, pedirDesenlace };
+  return { messages, status, thinking, error, aviso, debateId, ayuda, esperandoSiguiente, siguiente, play, pause, intervene, textRead, stop, pedirDesenlace };
 }
