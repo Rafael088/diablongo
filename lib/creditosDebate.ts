@@ -6,7 +6,7 @@ import type { DebateRole, ProviderConfig } from "../types/index.ts";
 // debate falla (app/api/debate/route.ts).
 export const PROVEEDOR_CREDITOS = "creditos";
 
-// PROVISIONAL: modelos y costo los decide una persona con el costo real (tarea cotejo-j9s6uq).
+// Modelos y costo confirmados el 2026-10-22 (tarea cotejo-j9s6uq).
 // Precios en la API pública de OpenRouter el 2026-10-20 (USD por millón de tokens, entrada/salida):
 //   anthropic/claude-haiku-5.5    0,10 / 0,50
 //   google/gemini-3.1-flash-lite  0,25 / 1,50
@@ -20,7 +20,7 @@ export const MODELOS_CREDITOS: Record<DebateRole, readonly string[]> = {
   con: ["google/gemini-3.1-flash-lite", "deepseek/deepseek-v4-pro"],
 };
 
-/** Créditos que cuesta un debate completo (8 turnos + desenlace). PROVISIONAL. */
+/** Créditos que cuesta un debate completo (8 turnos + desenlace). */
 export const CREDITOS_POR_DEBATE = 1;
 
 export function elegirModeloCreditos(rol: DebateRole, intento = 0): string | undefined {

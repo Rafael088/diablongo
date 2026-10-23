@@ -22,7 +22,7 @@ describe("paquetes", () => {
     }
   });
   it("solo acepta ids conocidos", () => {
-    expect(paquetePorId("basico")?.id).toBe("basico");
+    expect(paquetePorId("probadita")?.id).toBe("probadita");
     for (const malo of ["nada", "", 5, null, undefined, {}, "__proto__", "constructor"]) expect(paquetePorId(malo)).toBeNull();
   });
 });
@@ -77,7 +77,7 @@ describe("POST /api/pagos/preferencia", () => {
 
   it("sin sesión: 401 y no llama a Mercado Pago", async () => {
     sesion.cliente = conUsuario(null);
-    expect((await POST(peticion({ paquete: "basico" }))).status).toBe(401);
+    expect((await POST(peticion({ paquete: "probadita" }))).status).toBe(401);
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it("paquete inválido o cuerpo roto: 400", async () => {
@@ -87,14 +87,14 @@ describe("POST /api/pagos/preferencia", () => {
   });
   it("sin token: 503", async () => {
     vi.stubEnv("MERCADOPAGO_ACCESS_TOKEN", "");
-    const r = await POST(peticion({ paquete: "basico" }));
+    const r = await POST(peticion({ paquete: "probadita" }));
     expect(r.status).toBe(503);
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it("éxito: devuelve init_point y manda precio del servidor, token e idempotencia", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ init_point: "https://mp.test/pagar" }), { status: 201 }));
     // un precio colado por el cliente se ignora
-    const r = await POST(peticion({ paquete: "pro", precio: 1, unit_price: 1 }));
+    const r = await POST(peticion({ paquete: "diablazo", precio: 1, unit_price: 1 }));
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({ url: "https://mp.test/pagar" });
     const [url, init] = fetchMock.mock.calls[0];
@@ -102,20 +102,20 @@ describe("POST /api/pagos/preferencia", () => {
     expect(init.headers.Authorization).toBe("Bearer APP_USR-secreto-123");
     expect(init.headers["X-Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/);
     const enviado = JSON.parse(init.body);
-    expect(enviado.items[0].unit_price).toBe(paquetePorId("pro")!.precioCop);
-    expect(enviado.external_reference).toMatch(/^user-1:pro:[0-9a-f-]{36}$/);
+    expect(enviado.items[0].unit_price).toBe(paquetePorId("diablazo")!.precioCop);
+    expect(enviado.external_reference).toMatch(/^user-1:diablazo:[0-9a-f-]{36}$/);
     expect(enviado.back_urls.success).toBe("https://agent.test/pagos/vuelta");
   });
   it("error de Mercado Pago: 502 sin filtrar el token", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ message: "Bearer APP_USR-secreto-123 inválido" }), { status: 401 }));
-    const r = await POST(peticion({ paquete: "basico" }));
+    const r = await POST(peticion({ paquete: "probadita" }));
     expect(r.status).toBe(502);
     expect(await r.text()).not.toContain("secreto-123");
     expect(JSON.stringify((console.error as ReturnType<typeof vi.fn>).mock.calls)).not.toContain("secreto-123");
   });
   it("fallo de red: 502", async () => {
     fetchMock.mockRejectedValue(new Error("red caída con APP_USR-secreto-123"));
-    const r = await POST(peticion({ paquete: "basico" }));
+    const r = await POST(peticion({ paquete: "probadita" }));
     expect(r.status).toBe(502);
     expect(await r.text()).not.toContain("secreto-123");
   });

@@ -46,23 +46,23 @@ describe("referencia y decisión", () => {
   const aprobado = {
     id: 123456,
     status: "approved",
-    external_reference: `${ANA}:basico:${INTENTO}`,
-    transaction_amount: 5000,
+    external_reference: `${ANA}:probadita:${INTENTO}`,
+    transaction_amount: 10000,
     currency_id: "COP",
   };
 
   it("lee la external_reference que arma la preferencia", () => {
-    expect(leerReferencia(`${ANA}:popular:${INTENTO}`)).toMatchObject({ usuario: ANA, paquete: { id: "popular", creditos: 30 } });
-    for (const mala of [null, 42, "", `${ANA}:inventado:${INTENTO}`, `${ANA}:basico`, `${ANA}:basico:${INTENTO}:x`, `ana:basico:${INTENTO}`]) {
+    expect(leerReferencia(`${ANA}:popular:${INTENTO}`)).toMatchObject({ usuario: ANA, paquete: { id: "popular", creditos: 50 } });
+    for (const mala of [null, 42, "", `${ANA}:inventado:${INTENTO}`, `${ANA}:basico`, `${ANA}:probadita:${INTENTO}:x`, `ana:probadita:${INTENTO}`]) {
       expect(leerReferencia(mala)).toBeNull();
     }
   });
 
   it("solo un pago aprobado, en COP y con el monto del paquete acredita", () => {
-    expect(decidirPago(aprobado, "123456")).toEqual({ accion: "acreditar", usuario: ANA, creditos: 10, pagoId: "123456" });
+    expect(decidirPago(aprobado, "123456")).toEqual({ accion: "acreditar", usuario: ANA, creditos: 15, pagoId: "123456" });
     expect(decidirPago({ ...aprobado, status: "pending" }, "123456").accion).toBe("ignorar");
     expect(decidirPago({ ...aprobado, status: "rejected" }, "123456").accion).toBe("ignorar");
-    expect(decidirPago({ ...aprobado, transaction_amount: 4999 }, "123456").accion).toBe("alerta");
+    expect(decidirPago({ ...aprobado, transaction_amount: 9999 }, "123456").accion).toBe("alerta");
     expect(decidirPago({ ...aprobado, currency_id: "USD" }, "123456").accion).toBe("alerta");
     expect(decidirPago({ ...aprobado, external_reference: "de-otra-tienda" }, "123456").accion).toBe("alerta");
     expect(decidirPago(aprobado, "777").accion).toBe("alerta");
@@ -90,7 +90,7 @@ describe("POST /api/pagos/webhook", () => {
     consultas = [];
     pagoMp = {
       status: 200,
-      cuerpo: { id: 123456, status: "approved", external_reference: `${ANA}:basico:${INTENTO}`, transaction_amount: 5000, currency_id: "COP" },
+      cuerpo: { id: 123456, status: "approved", external_reference: `${ANA}:probadita:${INTENTO}`, transaction_amount: 10000, currency_id: "COP" },
     };
     globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       consultas.push(String(url));
@@ -131,7 +131,7 @@ describe("POST /api/pagos/webhook", () => {
     const r2 = await POST(aviso());
     expect(r2.status).toBe(200);
     expect(await r2.json()).toEqual({ acreditado: false });
-    expect(await base.saldo(ANA)).toBe(10);
+    expect(await base.saldo(ANA)).toBe(15);
     expect(await base.movimientos(ANA)).toBe(1);
   });
 

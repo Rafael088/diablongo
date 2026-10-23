@@ -76,7 +76,7 @@ una sola conexión); ahí protege el `UPDATE … WHERE creditos >= n` y el índi
 
 ## Comprar créditos (Mercado Pago Checkout Pro)
 
-Cada paquete (`lib/paquetes.ts`, **precios provisionales** hasta la tarea cotejo-j9s6uq) se paga con una
+Cada paquete (`lib/paquetes.ts`: Probadita 15 por $10.000, Popular 50 por $25.000, Diablazo 150 por $60.000) se paga con una
 preferencia de Checkout Pro:
 
 1. «Comprar créditos» en el panel → `POST /api/pagos/preferencia { paquete }`.
@@ -138,7 +138,7 @@ pago de la simulación no existe).
 
 Cuarto modo de la configuración; solo aparece si las cuentas están configuradas. Ángel y Diablo juegan con
 modelos de pago y la key del servidor (`OPENROUTER_API_KEY`), como el modo gratis pero sin límite diario.
-Modelos y costo están en `lib/creditosDebate.ts` (**provisionales** hasta cotejo-j9s6uq): 1 crédito por
+Modelos y costo están en `lib/creditosDebate.ts`: 1 crédito por
 debate; Claude Haiku 5.5 / Gemini 3.1 Flash Lite para el Ángel y Gemini 3.1 Flash Lite / DeepSeek V4 Pro para el
 Diablo (el segundo de cada lista es el respaldo). Un debate de 9 llamadas cuesta menos de 2 centavos de dólar.
 

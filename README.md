@@ -42,7 +42,7 @@ Conecta tu cuenta OpenRouter con OAuth PKCE en el navegador. La key solo vive en
 Pega tu propia API key de OpenRouter, Google Gemini o Groq (Ollama local solo en desarrollo). Se guarda en la pestaña (`sessionStorage`); marca «Recordar en este dispositivo» para guardarla en `localStorage`.
 
 ### Con créditos
-Solo aparece si las cuentas (Supabase) están configuradas; los créditos se compran con Mercado Pago. Entra con Google o un enlace al correo y juega con modelos de pago que pone el servidor. 1 crédito por debate, que se devuelve si los modelos fallan en mitad del debate. Modelos y costo son provisionales (`lib/creditosDebate.ts`), igual que los paquetes (`lib/paquetes.ts`).
+Solo aparece si las cuentas (Supabase) están configuradas; los créditos se compran con Mercado Pago. Entra con Google o un enlace al correo y juega con modelos de pago que pone el servidor. 1 crédito por debate, que se devuelve si los modelos fallan en mitad del debate. Modelos y costo en `lib/creditosDebate.ts`; paquetes y precios en `lib/paquetes.ts`.
 
 Mira **[Cuentas y créditos (docs/cuentas.md)](./docs/cuentas.md)** para la guía completa.
 
