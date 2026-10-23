@@ -1,58 +1,27 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import Link from "next/link";
 import { X } from "lucide-react";
+import { useDialogo } from "@/hooks/useDialogo";
 
 interface PanelAjustesProps {
   abierto: boolean;
   onCerrar: () => void;
+  /** Columna izquierda: cómo jugar y la cuenta. */
+  lateral: ReactNode;
+  /** Lo propio del modo elegido. */
   children: ReactNode;
 }
 
-const ENFOCABLES = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 /**
- * Panel lateral de Ajustes (modo de juego, keys, cuenta). Se abre desde la derecha sobre el
- * inicio; Esc, el fondo o la X lo cierran y el foco vuelve al botón que lo abrió.
- * El contenido de detrás queda `inert` desde ConfigPanel mientras está abierto.
+ * Ajustes (modo de juego, keys, personalidades, cuenta). En escritorio es una ventana grande centrada
+ * con dos columnas; en el celular ocupa toda la pantalla y las columnas se apilan. Esc, el fondo, la X
+ * o «Listo» lo cierran y el foco vuelve al botón que lo abrió. El inicio queda `inert` detrás (ConfigPanel).
  */
-export default function PanelAjustes({ abierto, onCerrar, children }: PanelAjustesProps) {
+export default function PanelAjustes({ abierto, onCerrar, lateral, children }: PanelAjustesProps) {
   const panel = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!abierto) return;
-    const anterior = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    panel.current?.querySelector<HTMLElement>(ENFOCABLES)?.focus();
-
-    const alTeclear = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onCerrar();
-        return;
-      }
-      if (e.key !== "Tab" || !panel.current) return;
-      // El foco da la vuelta dentro del panel.
-      const lista = [...panel.current.querySelectorAll<HTMLElement>(ENFOCABLES)];
-      if (lista.length === 0) return;
-      const primero = lista[0];
-      const ultimo = lista[lista.length - 1];
-      if (e.shiftKey && document.activeElement === primero) {
-        e.preventDefault();
-        ultimo.focus();
-      } else if (!e.shiftKey && document.activeElement === ultimo) {
-        e.preventDefault();
-        primero.focus();
-      }
-    };
-    document.addEventListener("keydown", alTeclear);
-    return () => {
-      document.removeEventListener("keydown", alTeclear);
-      document.body.style.overflow = overflow;
-      anterior?.focus();
-    };
-  }, [abierto, onCerrar]);
+  useDialogo(panel, abierto, onCerrar);
 
   if (!abierto) return null;
   return (
@@ -65,7 +34,18 @@ export default function PanelAjustes({ abierto, onCerrar, children }: PanelAjust
             <X className="w-5 h-5" aria-hidden />
           </button>
         </div>
-        <div className="ajustes-cuerpo">{children}</div>
+        <div className="ajustes-cuerpo">
+          <div className="ajustes-lateral">{lateral}</div>
+          <div className="ajustes-detalle">{children}</div>
+        </div>
+        <div className="ajustes-pie">
+          <Link href="/terminos" className="ajustes-pie-enlace">
+            Términos y condiciones
+          </Link>
+          <button type="button" className="ajustes-listo" onClick={onCerrar}>
+            Listo
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { proveedoresDisponibles, getProviderById } from "@/lib/providers";
 import { DebateConfig, DebaterConfig, DebateRole, ProviderConfig } from "@/types";
 import { getConfig, saveConfig, SavedConfig } from "@/lib/storage";
-import { Settings2, Eye, EyeOff } from "lucide-react";
+import { Settings2, Eye, EyeOff, Lock } from "lucide-react";
 import Logo from "@/components/Logo";
 import PixelSprite from "@/components/PixelSprite";
 import { iniciarConexion, procesarVuelta, PROVEEDOR_OAUTH } from "@/lib/oauthOpenRouter";
@@ -17,6 +17,7 @@ import {
   ModoConfig,
   OPENROUTER_DISPONIBLE,
   modoDelServidor,
+  modoEfectivo,
   modoInicial,
   pedirCupo,
   proveedorDelModo,
@@ -25,7 +26,9 @@ import {
 } from "@/lib/modoConfig";
 import TurnstileWidget from "./TurnstileWidget";
 import PanelAjustes from "./PanelAjustes";
-import Cuenta from "./Cuenta";
+import Cuenta, { type VistaCuenta } from "./Cuenta";
+import FotoDilema from "./FotoDilema";
+import { creditosDe, useCuenta } from "@/hooks/useCuenta";
 import MisRetos from "./MisRetos";
 import { configSupabase } from "@/lib/supabase/config";
 import { CREDITOS_POR_DEBATE } from "@/lib/creditosDebate";
@@ -85,7 +88,15 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
   const disponibles = proveedoresDisponibles();
   const porDefecto = disponibles[0];
   const hayKeys = disponibles.some((p) => leerKey(p.id) !== "");
-  const [modo, setModo] = useState<ModoConfig>(() => (vieneDeOpenRouter() ? "openrouter" : modoInicial(saved, hayKeys, HAY_CUENTAS)));
+  const [modoElegido, setModo] = useState<ModoConfig>(() => (vieneDeOpenRouter() ? "openrouter" : modoInicial(saved, hayKeys, HAY_CUENTAS)));
+  // Cuenta: sin sesión, «Con créditos» no se puede elegir y un modo guardado así juega en Gratis.
+  const cuenta = useCuenta();
+  const creditos = creditosDe(cuenta.estado);
+  const modo = modoEfectivo(modoElegido, creditos);
+  const [vistaCuenta, setVistaCuenta] = useState<VistaCuenta>("nada");
+  // Foto del dilema: solo con créditos y con sesión; nunca se guarda.
+  const [foto, setFoto] = useState<string | null>(null);
+  const conFoto = modo === "creditos" && typeof creditos === "number";
   const [topic, setTopic] = useState((saved?.topic ?? "").slice(0, MAX_TEMA));
 
   const [proProvider, setProProvider] = useState(proveedorValido(saved?.proProvider, disponibles));
@@ -174,7 +185,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
     return () => ac.abort();
   }, [modo]);
   const contador: EstadoContador = contadorPedido ?? { tipo: "cargando" };
-  const puedeEmpezar = puedeIniciar({ modo, tema: topic, verificado, contador, conectadoOpenRouter: conectado });
+  const puedeEmpezar = puedeIniciar({ modo, tema: topic, verificado, contador, conectadoOpenRouter: conectado, creditos });
 
   const proModel = modeloValido(proProv0, proModelRaw);
   const conModel = modeloValido(conProv0, conModelRaw);
@@ -220,21 +231,36 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
       personalidad: modo === "creditos" ? conPersonalidad : PERSONALIDAD_CLASICA.con,
     };
 
-    onStart({ topic: topic.trim(), pro, con }, tokenTurnstile ?? undefined);
+    onStart({ topic: topic.trim(), pro, con, ...(conFoto && foto ? { foto } : {}) }, tokenTurnstile ?? undefined);
   };
 
   // Ajustes: se abre solo al volver de OpenRouter o de un login fallido, para ver el resultado.
   const [ajustes, setAjustes] = useState(
     () => vieneDeOpenRouter() || (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("cuenta") === "error")
   );
-  const cerrarAjustes = useCallback(() => setAjustes(false), []);
-  const abrirAjustes = () => setAjustes(true);
+  const cerrarAjustes = useCallback(() => {
+    setAjustes(false);
+    setVistaCuenta("nada");
+  }, [setVistaCuenta]);
+  const abrirAjustes = (vista: VistaCuenta = "nada") => {
+    setVistaCuenta(vista);
+    setAjustes(true);
+  };
+  // «Con créditos» sin sesión: en vez de elegirlo, abre el login y lo enfoca.
+  const pedirEntrada = () => {
+    setVistaCuenta("entrar");
+    requestAnimationFrame(() => {
+      const google = document.getElementById("cuenta-google");
+      google?.scrollIntoView({ block: "center", behavior: "smooth" });
+      google?.focus({ preventScroll: true });
+    });
+  };
 
   return (
     <>
       <div className="inicio" inert={ajustes}>
         <header className="inicio-barra">
-          <button type="button" className="inicio-ajustes" onClick={abrirAjustes} aria-haspopup="dialog">
+          <button type="button" className="inicio-ajustes" onClick={() => abrirAjustes()} aria-haspopup="dialog">
             <Settings2 className="w-5 h-5" aria-hidden />
             Ajustes
           </button>
@@ -272,6 +298,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
             <p className="inicio-cuenta" aria-live="off">
               {topic.length}/{MAX_TEMA}
             </p>
+            {conFoto && <FotoDilema foto={foto} onChange={setFoto} />}
           </div>
 
           <EstadoModo
@@ -279,7 +306,8 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
             contador={contador}
             conectado={conectado}
             proveedor={getProviderById(proProvider)?.name ?? proProvider}
-            onCambiar={abrirAjustes}
+            creditos={creditos}
+            onCambiar={(vista) => abrirAjustes(vista)}
           />
 
           {SITEKEY_TURNSTILE ? (
@@ -303,21 +331,41 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
         </motion.div>
       </div>
 
-      <PanelAjustes abierto={ajustes} onCerrar={cerrarAjustes}>
-        <SelectorModo modo={modo} onChange={setModo} />
-
-        {modo === "creditos" && (
-          <p className="config-aviso" role="status">
-            Ángel y Diablo juegan con modelos de pago. Cada debate cuesta {textoCreditos(CREDITOS_POR_DEBATE)} de tu
-            cuenta; si los modelos fallan antes de terminar, te lo devolvemos. Entra a tu cuenta aquí abajo.
-          </p>
-        )}
-
-        {modo === "creditos" && (
+      <PanelAjustes
+        abierto={ajustes}
+        onCerrar={cerrarAjustes}
+        lateral={
           <>
+            <SelectorModo modo={modo} creditos={creditos} onChange={setModo} onPedirEntrada={pedirEntrada} />
+            <Cuenta
+              estado={cuenta.estado}
+              errorLogin={cuenta.errorLogin}
+              recargar={cuenta.recargar}
+              vista={vistaCuenta}
+              onVista={setVistaCuenta}
+            />
+          </>
+        }
+      >
+        <div className="ajustes-detalle-cabecera">
+          <h3 className="ajustes-detalle-titulo">{TITULO_MODO[modo]}</h3>
+          <p className="ajustes-detalle-texto">
+            {modo === "openrouter"
+              ? "Juegas con tu cuenta de OpenRouter y eliges el modelo de cada uno. La key que te da OpenRouter se guarda solo en esta pestaña y se borra al cerrarla; nunca pasa por nuestro servidor."
+              : modo === "creditos"
+              ? `Ángel y Diablo juegan con modelos de pago, eliges su personalidad y puedes mandarles una foto. Cada debate cuesta ${textoCreditos(CREDITOS_POR_DEBATE)}; si los modelos fallan antes de terminar, te lo devolvemos.`
+              : modo === "key"
+              ? "Usa tu propia API key para cada personaje. Se guarda solo en esta pestaña y se borra al cerrarla, salvo que marques «Recordar en este dispositivo». Nunca pasa por nuestro servidor."
+              : "No necesitas key ni cuenta: el servidor pone los modelos y hay un límite de debates por día. No guardamos nada tuyo."}
+          </p>
+          {modo === "gratis" && <p className="config-aviso">{textoContador(contador)}</p>}
+        </div>
+
+        {modo === "creditos" && (
+          <div className="ajustes-duelo">
             <SelectorPersonalidad rol="pro" valor={proPersonalidad} onChange={setProPersonalidad} />
             <SelectorPersonalidad rol="con" valor={conPersonalidad} onChange={setConPersonalidad} />
-          </>
+          </div>
         )}
 
         {modo === "openrouter" && (
@@ -331,9 +379,9 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
         )}
 
         {(modo === "key" || (modo === "openrouter" && conectado)) && (
-          <>
+          <div className="ajustes-duelo">
             <DebaterForm
-              title="Modelo del Ángel"
+              title="Ángel"
               color="pro"
               provider={proProv0}
               soloModelo={enOpenRouter}
@@ -347,7 +395,7 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
               onDesconectar={() => desconectar(proProv0)}
             />
             <DebaterForm
-              title="Modelo del Diablo"
+              title="Diablo"
               color="con"
               provider={conProv0}
               soloModelo={enOpenRouter}
@@ -360,25 +408,10 @@ function ConfigForm({ saved, onStart }: ConfigPanelProps & { saved: SavedConfig 
               onRecordarChange={(v) => cambiarRecordar(conProv0, v)}
               onDesconectar={() => desconectar(conProv0)}
             />
-          </>
+          </div>
         )}
 
-        <p className="config-nota">
-          {modo === "openrouter"
-            ? "La key que te da OpenRouter se guarda solo en esta pestaña y se borra al cerrarla. Nunca se envía a ningún servidor propio."
-            : modo === "creditos"
-            ? "No necesitas key: el servidor pone los modelos y descuenta los créditos al empezar."
-            : modo === "key"
-            ? "Tu API key se guarda solo en esta pestaña y se borra al cerrarla, salvo que marques «Recordar en este dispositivo». Nunca se envía a ningún servidor propio."
-            : "Sin key no guardamos nada tuyo: el servidor pone el modelo y el límite es por día."}
-        </p>
-
-        <Cuenta />
-        <MisRetos />
-
-        <p className="ajustes-legal">
-          <Link href="/terminos">Términos y condiciones</Link>
-        </p>
+        {modo === "creditos" && <MisRetos />}
       </PanelAjustes>
     </>
   );
@@ -418,10 +451,12 @@ function EstadoModo(props: {
   contador: EstadoContador;
   conectado: boolean;
   proveedor: string;
-  onCambiar: () => void;
+  creditos: number | null | undefined;
+  onCambiar: (vista?: VistaCuenta) => void;
 }) {
-  const { modo, contador, conectado, proveedor, onCambiar } = props;
-  const alerta = (modo === "gratis" && contador.tipo === "agotado") || (modo === "openrouter" && !conectado);
+  const { modo, contador, conectado, proveedor, creditos, onCambiar } = props;
+  const sinSaldo = modo === "creditos" && typeof creditos === "number" && creditos < CREDITOS_POR_DEBATE;
+  const alerta = (modo === "gratis" && contador.tipo === "agotado") || (modo === "openrouter" && !conectado) || sinSaldo;
   const texto =
     modo === "gratis"
       ? textoContador(contador)
@@ -431,12 +466,16 @@ function EstadoModo(props: {
         : "Falta conectar tu cuenta de OpenRouter."
       : modo === "key"
       ? `Juegas con tu propia key (${proveedor}).`
-      : `Juegas con créditos: ${textoCreditos(CREDITOS_POR_DEBATE)} por debate.`;
+      : creditos === undefined
+      ? "Mirando tu cuenta…"
+      : sinSaldo
+      ? "No te quedan créditos para este debate."
+      : `Juegas con créditos: te quedan ${textoCreditos(creditos ?? 0)}.`;
   return (
     <p className={`inicio-estado${alerta ? " inicio-estado-alerta" : ""}`} role="status" aria-live="polite">
       <span>{texto}</span>
-      <button type="button" className="inicio-cambiar" onClick={onCambiar}>
-        {alerta && modo === "openrouter" ? "Conectar" : "Cambiar"}
+      <button type="button" className="inicio-cambiar" onClick={() => onCambiar(sinSaldo ? "comprar" : "nada")}>
+        {alerta && modo === "openrouter" ? "Conectar" : sinSaldo ? "Comprar" : "Cambiar"}
       </button>
     </p>
   );
@@ -477,9 +516,11 @@ function DebaterForm({
 
   return (
     <div className={`config-seccion config-seccion-${color}`}>
-      <div className="flex items-center gap-2">
-        <Settings2 className="w-5 h-5" />
-        <h3 className="config-seccion-titulo">{title}</h3>
+      <div className="config-seccion-cabeza">
+        <span aria-hidden="true" className="config-seccion-sprite">
+          <PixelSprite personaje={color} fotograma="reposo" escala={1} />
+        </span>
+        <h4 className="config-seccion-titulo">{title}</h4>
       </div>
 
       {!soloModelo && (
@@ -564,31 +605,54 @@ const OPCIONES_MODO: { id: ModoConfig; titulo: string; detalle: string }[] = [
   { id: "gratis", titulo: "Gratis", detalle: "Sin key, con un límite por día" },
   { id: "openrouter", titulo: "Conectar OpenRouter", detalle: OPENROUTER_DISPONIBLE ? "Con tu cuenta, sin copiar keys" : "Próximamente" },
   { id: "key", titulo: "Mi key", detalle: "Usa tu propia API key" },
-  { id: "creditos", titulo: "Con créditos", detalle: `Modelos buenos, ${textoCreditos(CREDITOS_POR_DEBATE)} por debate` },
+  { id: "creditos", titulo: "Con créditos", detalle: `Personalidades y fotos, ${textoCreditos(CREDITOS_POR_DEBATE)} por debate` },
 ];
 
-function SelectorModo({ modo, onChange }: { modo: ModoConfig; onChange: (m: ModoConfig) => void }) {
+const TITULO_MODO = Object.fromEntries(OPCIONES_MODO.map((o) => [o.id, o.titulo])) as Record<ModoConfig, string>;
+
+function SelectorModo(props: {
+  modo: ModoConfig;
+  creditos: number | null | undefined;
+  onChange: (m: ModoConfig) => void;
+  onPedirEntrada: () => void;
+}) {
+  const { modo, creditos, onChange, onPedirEntrada } = props;
   return (
     <div>
       <h3 id="modo-etiqueta" className="ajustes-seccion">¿Cómo quieres jugar?</h3>
-      <div
-        role="radiogroup"
-        aria-labelledby="modo-etiqueta"
-        className="grid grid-cols-1 gap-2"
-      >
-        {OPCIONES_MODO.filter((o) => o.id !== "creditos" || HAY_CUENTAS).map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            role="radio"
-            aria-checked={modo === o.id}
-            onClick={() => onChange(o.id)}
-            className={`config-modo${modo === o.id ? " config-modo-activo" : ""}`}
-          >
-            <span className="config-modo-titulo">{o.titulo}</span>
-            <span className="config-modo-detalle">{o.detalle}</span>
-          </button>
-        ))}
+      <div role="radiogroup" aria-labelledby="modo-etiqueta" className="config-modos">
+        {OPCIONES_MODO.filter((o) => o.id !== "creditos" || HAY_CUENTAS).map((o) => {
+          // «Con créditos» necesita sesión: sin ella la opción se ve con candado y al tocarla abre el login.
+          const bloqueada = o.id === "creditos" && typeof creditos !== "number";
+          const detalle =
+            o.id !== "creditos"
+              ? o.detalle
+              : creditos === undefined
+              ? "Mirando tu cuenta…"
+              : creditos === null
+              ? "Entra a tu cuenta para usarlo"
+              : `${o.detalle} · tienes ${textoCreditos(creditos)}`;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              role="radio"
+              aria-checked={modo === o.id}
+              aria-disabled={bloqueada || undefined}
+              onClick={() => {
+                if (!bloqueada) onChange(o.id);
+                else if (creditos === null) onPedirEntrada();
+              }}
+              className={`config-modo${modo === o.id ? " config-modo-activo" : ""}${bloqueada ? " config-modo-bloqueado" : ""}`}
+            >
+              <span className="config-modo-titulo">
+                {o.titulo}
+                {bloqueada && <Lock className="config-modo-candado" aria-hidden />}
+              </span>
+              <span className="config-modo-detalle">{detalle}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

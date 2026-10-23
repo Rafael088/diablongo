@@ -21,15 +21,17 @@ Cada turno son 1 o 2 frases (unas 35 palabras) y refuta lo último que dijo el o
 1. **Inicio** (`/`, `ConfigPanel`): una sola columna centrada con lo mínimo para jugar.
    - Logo entre el Ángel y el Diablo.
    - «¿Qué dilema tienes?»: textarea (máx. 200 caracteres, `MAX_TEMA`).
-   - Una línea de estado (`EstadoModo`) que dice cómo vas a jugar: en Gratis, cuántos debates te quedan hoy; en los otros modos, con qué juegas. «Cambiar» abre Ajustes (en rojo claro y «Conectar» si falta algo).
+   - **Foto del dilema** (`FotoDilema`, solo con créditos y sesión): «Tomar foto» abre la cámara del sistema en el celular (`capture`) o la webcam en un diálogo en el computador; «Subir foto» abre el selector. Se reduce a 1024 px en JPEG antes de salir y se muestra como miniatura con «Cambiar» y «Quitar».
+   - Una línea de estado (`EstadoModo`) que dice cómo vas a jugar: en Gratis, cuántos debates te quedan hoy; en créditos, cuántos créditos te quedan; en los otros modos, con qué juegas. «Cambiar» abre Ajustes (en rojo claro y «Conectar» o «Comprar» si falta algo).
    - **Cloudflare Turnstile** (si está configurado).
    - Botón «Iniciar Debate» (habilitado si el tema no está vacío, Turnstile pasó y el modo está listo; `puedeIniciar`).
    - Aviso legal corto: es un juego, la IA no aconseja, tú decides; enlace a `/terminos`.
-2. **Ajustes** (`PanelAjustes`, botón arriba a la derecha): panel lateral que entra desde la derecha, con foco atrapado, Esc y el fondo para cerrar, y el inicio `inert` detrás. Se abre solo al volver de OpenRouter (`?code=`) o de un login fallido (`?cuenta=error`). Lleva:
-   - **Selector de modo**: Gratis, Conectar OpenRouter, Mi key y Con créditos (solo si hay cuentas).
-   - Lo propio de cada modo: conexión OAuth, modelo y key del Ángel y del Diablo (en columna), aviso de créditos, nota de privacidad.
-   - **Tu cuenta** (`Cuenta`): entrar con Google o enlace al correo, créditos, comprar, salir. Sin Supabase no aparece.
-   - Enlace a los términos.
+2. **Ajustes** (`PanelAjustes`, botón arriba a la derecha): en escritorio, ventana grande centrada (hasta 62 × 48 rem) que se abre en pasos, de una franja al alto completo; bajo 760 px, pantalla completa. Foco atrapado (`hooks/useDialogo.ts`), Esc, el fondo, la X o «Listo» para cerrar, y el inicio `inert` detrás. Se abre solo al volver de OpenRouter (`?code=`) o de un login fallido (`?cuenta=error`). Dos columnas:
+   - **Izquierda** (fondo superficie): **selector de modo** (Gratis, Conectar OpenRouter, Mi key y Con créditos, este solo si hay cuentas) y **Tu cuenta** (`Cuenta`: entrar con Google o enlace al correo, créditos, comprar, salir; sin Supabase no aparece).
+   - **Derecha**: título del modo, qué significa y su nota de privacidad, y lo propio del modo con el **Ángel y el Diablo lado a lado** (key y modelo, o personalidad). En créditos, además, «Mis retos».
+   - **Pie**: enlace a los términos y «Listo».
+   - En el celular todo va en una columna, en este orden: modos → lo del modo → cuenta.
+   - **Con créditos sin sesión**: la opción sale con candado y borde punteado («Entra a tu cuenta para usarlo»); al tocarla no se elige, se abre el login y se enfoca «Entrar con Google». Un modo créditos guardado sin sesión juega en Gratis (`modoEfectivo`). El estado de la cuenta lo lleva `hooks/useCuenta.ts` para el selector, la cuenta y el botón de iniciar.
 3. **Arena** (`DebateArena`): 8 turnos (apertura, 3 cruces, última palabra) con caja de diálogo letra por letra. Tras el turno 4 la persona puede intervenir (no es una llamada extra) o seguir. Cada frase se puede marcar con un pulgar y mueve la barra de tentación.
 4. **Elección**: «¿A quién le haces caso?»; la barra sugiere (borde azul) al que va ganando.
 5. **Tarjeta** (`TarjetaDesenlace`): PNG de 1080×1350 con la decisión, el sprite ganador y un desenlace de 20 palabras; descargar, compartir o jugar otra vez.
@@ -53,8 +55,13 @@ En `ConfigPanel`, `puedeIniciar()` (`lib/modoConfig.ts`) verifica:
 - Turnstile pasado (si hay sitekey).
 - Cupo del día no agotado (Gratis).
 - Cuenta de OpenRouter conectada (Conectar OpenRouter).
+- Sesión abierta y saldo suficiente (Con créditos).
 
-La sesión y el saldo de «Con créditos» los comprueba el servidor al empezar.
+El servidor vuelve a comprobar la sesión y el saldo de «Con créditos» al empezar.
+
+### Foto del dilema (solo créditos)
+
+La imagen no viaja en cada turno. En `/api/debate/start` llega como data URL (JPG, PNG o WebP de hasta 1 MB; `validarFoto`, `lib/foto.ts`). Después de cobrar, `guardiaFoto` le pide a un modelo con visión (Gemini 3.1 Flash Lite, con Haiku 5.5 de respaldo) que la describa en máximo 50 palabras. La descripción pasa por `esTemaCritico`. Si la foto no es apta o no se pudo ver, el crédito se devuelve en el acto. La descripción va ligada al token con la huella `fh`, el cliente la reenvía en cada turno (`descripcionFoto`) y el prompt la incluye como «Foto que mandó el usuario». La foto no se guarda en ningún lado. En la arena se ve como miniatura sobre el tema, con la descripción como texto alternativo.
 
 En `POST /api/debate/start`, `guardiaCreditos` (la última guardia después de Turnstile) descuenta créditos si toca y devuelve el token firmado con el id del debate.
 

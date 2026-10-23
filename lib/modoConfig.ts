@@ -1,5 +1,5 @@
 import { PROVEEDOR_GRATIS } from "./gratis.ts";
-import { PROVEEDOR_CREDITOS } from "./creditosDebate.ts";
+import { CREDITOS_POR_DEBATE, PROVEEDOR_CREDITOS } from "./creditosDebate.ts";
 
 // Los modos de la pantalla de configuración son excluyentes. «creditos» solo se ofrece si hay
 // cuentas (Supabase configurado): modelos de pago con la key del servidor, cobrados en créditos.
@@ -52,11 +52,23 @@ export function puedeIniciar(opts: {
   conectadoOpenRouter?: boolean;
   /** Estado del contador: con cupo agotado, el modo gratis no deja iniciar (el servidor respondería 429). */
   contador?: EstadoContador;
+  /** Créditos de la sesión: número con sesión, null sin sesión, undefined mientras carga (lib/cuenta.ts). */
+  creditos?: number | null;
 }): boolean {
   if (!opts.tema.trim() || !opts.verificado) return false;
   if (opts.modo === "gratis" && opts.contador?.tipo === "agotado") return false;
   if (opts.modo === "openrouter") return OPENROUTER_DISPONIBLE && (opts.conectadoOpenRouter ?? false);
+  // Sin sesión o sin saldo el servidor respondería 401/402: mejor no dejar empezar.
+  if (opts.modo === "creditos") return typeof opts.creditos === "number" && opts.creditos >= CREDITOS_POR_DEBATE;
   return true;
+}
+
+/**
+ * Modo con el que se juega de verdad. «Con créditos» guardado pero sin sesión cae a Gratis (la opción
+ * queda bloqueada hasta entrar); mientras la cuenta carga se respeta, para no parpadear.
+ */
+export function modoEfectivo(modo: ModoConfig, creditos: number | null | undefined): ModoConfig {
+  return modo === "creditos" && creditos === null ? "gratis" : modo;
 }
 
 /** Proveedor que usa cada debatiente según el modo (en «key» elige la persona; en el resto no hay elección). */

@@ -103,7 +103,7 @@ export default function DebateArena({
     turnstile,
     sinPausa: pantallaFinal !== undefined,
   });
-  const { messages, status, thinking, error, aviso, textRead, esperandoSiguiente, siguiente } = debate;
+  const { messages, status, thinking, error, aviso, textRead, esperandoSiguiente, siguiente, descripcionFoto } = debate;
   const [interventionText, setInterventionText] = useState("");
   const soundEnabled = useSoundEnabled();
   const marcador = useMarcador();
@@ -270,7 +270,17 @@ export default function DebateArena({
 
   return (
     <div className="arena w-full max-w-3xl mx-auto">
-      <div className="text-center mb-3">
+      <div className={`text-center mb-3${config.foto ? " arena-cabecera-foto" : ""}`}>
+        {config.foto && (
+          // Data URL local: next/image no aporta nada aquí.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={config.foto}
+            alt={descripcionFoto ?? "Tu foto del dilema"}
+            title={descripcionFoto ?? undefined}
+            className="arena-foto"
+          />
+        )}
         <h2 className="arena-titulo">{config.topic}</h2>
         <p className="arena-sub">
           Turno {Math.min(turnsPlayed + (thinking ? 1 : 0), TOTAL_TURNS)} de {TOTAL_TURNS}

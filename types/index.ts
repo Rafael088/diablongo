@@ -45,6 +45,8 @@ export interface DebateConfig {
   topic: string;
   pro: DebaterConfig;
   con: DebaterConfig;
+  /** Foto del dilema como data URL (solo con créditos, lib/foto.ts). Nunca se guarda. */
+  foto?: string;
 }
 
 export interface DebateState {

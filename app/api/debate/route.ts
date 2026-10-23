@@ -77,7 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!validacion.ok) {
       return NextResponse.json({ error: validacion.error }, { status: validacion.status });
     }
-    const { topic, role, phase, provider, history, intervention } = validacion.datos;
+    const { topic, role, phase, provider, history, intervention, descripcionFoto } = validacion.datos;
     let { model, apiKey } = validacion.datos;
     const providerId = provider.id;
 
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const turno = comprobarTurno(
       permiso.payload,
       secreto,
-      { topic, role, phase, provider: providerId, model },
+      { topic, role, phase, provider: providerId, model, descripcionFoto },
       cuerpo.indice
     );
     if (!turno.ok) {
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const systemPrompt = buildSystemPrompt(role, personalidad.id);
-    const userPrompt = buildUserPrompt(topic, role, phase, history, intervention);
+    const userPrompt = buildUserPrompt(topic, role, phase, history, intervention, descripcionFoto);
 
     // Genera la frase con el proveedor del turno. No toca el registro ni los créditos: si falla, devuelve
     // `fallar`, que hace esos efectos solo si es la primera frase del turno (no al pedir otra al revisor).

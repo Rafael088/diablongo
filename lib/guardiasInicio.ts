@@ -5,7 +5,8 @@ import type { ConfigInicio } from "./tokenDebate.ts";
 import { clienteServidor } from "./supabase/servidor.ts";
 import { clienteAdmin } from "./supabase/admin.ts";
 import { contar, contarLimiteGratis } from "./metricas.ts";
-import { descontarDebate } from "./creditos.ts";
+import { descontarDebate, devolverDebate } from "./creditos.ts";
+import { MENSAJE_FOTO_FALLO, MENSAJE_FOTO_NO_APTA, describirFoto } from "./foto.ts";
 import { MENSAJE_TEMA_CRITICO, esTemaCritico } from "./temaCritico.ts";
 import {
   CREDITOS_POR_DEBATE,
@@ -24,7 +25,7 @@ import {
  * Aquí se enchufan las tareas siguientes, sin tocar la ruta:
  *  - cotejo-xqsxp8: límite diario por IP (3 debates) y cupo global en Upstash.
  *  - cotejo-tkwelc: descontar créditos de pago al empezar (guardiaCreditos).
- * Orden recomendado: Turnstile → tema crítico → límite por IP → cupo global → créditos (lo que
+ * Orden recomendado: Turnstile → tema crítico → límite por IP → cupo global → créditos → foto (lo que
  * cuesta dinero o cupo, al final, para no gastarlo si una guardia anterior rechaza).
  * Los mensajes de error no deben repetir nada de lo que mandó el usuario.
  */
@@ -39,6 +40,10 @@ export interface ContextoInicio {
   debateId: string;
   /** Cuenta que pagó (la pone guardiaCreditos): va en el token para saber a quién devolver. */
   usuario?: string;
+  /** Foto del dilema ya validada (data URL; solo créditos). */
+  foto?: string;
+  /** Lo que se ve en la foto (la pone guardiaFoto): va ligado al token y en cada turno. */
+  descripcionFoto?: string;
 }
 
 export interface RechazoGuardia {
@@ -120,7 +125,36 @@ export const guardiaCreditos: GuardiaInicio = async (ctx) => {
   }
 };
 
-export const GUARDIAS_INICIO: GuardiaInicio[] = [guardiaTurnstile, guardiaTemaCritico, guardiaLimiteGratis, guardiaCreditos];
+/**
+ * Foto del dilema (solo créditos, lib/foto.ts): un modelo con visión la describe y la descripción pasa
+ * por la barrera de temas críticos. Va DESPUÉS de cobrar para que solo una cuenta que paga gaste la
+ * llamada de visión; si la foto no sirve o no se pudo ver, el crédito se devuelve en el acto.
+ */
+export const guardiaFoto: GuardiaInicio = async (ctx) => {
+  if (!ctx.foto) return null;
+  const key = process.env.OPENROUTER_API_KEY;
+  const d = await describirFoto(ctx.foto, ctx.config.topic, key);
+  const critico = d.tipo === "ok" && (await esTemaCritico(d.texto, key));
+  if (d.tipo === "ok" && !critico) {
+    ctx.descripcionFoto = d.texto;
+    ctx.extra = { ...ctx.extra, descripcionFoto: d.texto };
+    return null;
+  }
+  const admin = clienteAdmin();
+  if (admin && ctx.usuario) await devolverDebate(admin, ctx.usuario, ctx.debateId).catch(() => {});
+  ctx.usuario = undefined;
+  if (critico) return { status: 422, error: MENSAJE_TEMA_CRITICO, campos: { critico: true } };
+  if (d.tipo === "no-apta") return { status: 422, error: MENSAJE_FOTO_NO_APTA, campos: { devuelto: true } };
+  return { status: 503, error: MENSAJE_FOTO_FALLO, campos: { devuelto: true } };
+};
+
+export const GUARDIAS_INICIO: GuardiaInicio[] = [
+  guardiaTurnstile,
+  guardiaTemaCritico,
+  guardiaLimiteGratis,
+  guardiaCreditos,
+  guardiaFoto,
+];
 
 export async function pasarGuardias(
   ctx: ContextoInicio,

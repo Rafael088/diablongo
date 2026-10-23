@@ -21,6 +21,8 @@ import { PERSONALIDAD_CLASICA, personalidadDe, validarPersonalidad } from "./per
  * Cada personaje lleva además pe (id de su personalidad, lib/personalidades.ts):
  * /api/debate la toma de aquí, nunca del cliente. Un token sin pe (emitido antes
  * de la v0.4.0) juega con la clásica. Nunca lleva la clave de API.
+ * Si el debate se empezó con foto (solo créditos, lib/foto.ts), lleva fh: la huella
+ * de la descripción de la foto; cada turno tiene que mandar esa misma descripción.
  *
  * El token es reutilizable por sí solo, así que cada turno manda además su
  * `indice` (0..8). /api/debate exige que el índice esté en el plan, que
@@ -63,6 +65,8 @@ export interface PayloadToken {
   exp: number;
   /** Cuenta que pagó el debate (solo modo créditos). */
   u?: string;
+  /** Huella de la descripción de la foto (solo si el debate se empezó con foto). */
+  fh?: string;
 }
 
 /** Configuración del debate que llega a /start (sin claves). */
@@ -112,6 +116,11 @@ export function huellaTema(secreto: Buffer, debateId: string, topic: string): st
   return hmac(secreto, "tema", `${debateId}\0${topic}`).toString("base64url");
 }
 
+/** Huella de la descripción de la foto, ligada al debate como la del tema. */
+export function huellaFoto(secreto: Buffer, debateId: string, descripcion: string): string {
+  return hmac(secreto, "foto", `${debateId}\0${descripcion}`).toString("base64url");
+}
+
 /** Comparación en tiempo constante de dos cadenas base64url (la longitud no es secreta). */
 function igualesSeguro(a: Buffer, b: Buffer): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
@@ -127,7 +136,7 @@ export function emitirToken(
   secreto: Buffer,
   ahora = Date.now(),
   /** id ya elegido (p. ej. el que se cobró en créditos) y cuenta que pagó. */
-  opciones: { id?: string; usuario?: string } = {}
+  opciones: { id?: string; usuario?: string; descripcionFoto?: string } = {}
 ): { token: string; payload: PayloadToken } {
   const id = opciones.id ?? randomUUID();
   const payload: PayloadToken = {
@@ -140,6 +149,7 @@ export function emitirToken(
     iat: ahora,
     exp: ahora + DURACION_TOKEN_MS,
     ...(opciones.usuario ? { u: opciones.usuario } : {}),
+    ...(opciones.descripcionFoto ? { fh: huellaFoto(secreto, id, opciones.descripcionFoto) } : {}),
   };
   return { token: firmarPayload(payload, secreto), payload };
 }
@@ -178,7 +188,8 @@ function esPayload(x: unknown): x is PayloadToken {
     esEntero(x.iat) &&
     esEntero(x.exp) &&
     x.exp > x.iat &&
-    (x.u === undefined || (typeof x.u === "string" && UUID.test(x.u)))
+    (x.u === undefined || (typeof x.u === "string" && UUID.test(x.u))) &&
+    (x.fh === undefined || (typeof x.fh === "string" && x.fh.length === 43 && B64URL.test(x.fh)))
   );
 }
 
@@ -257,7 +268,7 @@ export type ResultadoTurno =
 export function comprobarTurno(
   payload: PayloadToken,
   secreto: Buffer,
-  turno: { topic: string; role: DebateRole; phase: DebatePhase; provider: string; model: string },
+  turno: { topic: string; role: DebateRole; phase: DebatePhase; provider: string; model: string; descripcionFoto?: string },
   indice: unknown
 ): ResultadoTurno {
   if (!esEntero(indice) || indice < 0 || indice >= payload.n) {
@@ -275,6 +286,15 @@ export function comprobarTurno(
   const th = Buffer.from(huellaTema(secreto, payload.id, turno.topic), "base64url");
   if (!igualesSeguro(th, Buffer.from(payload.th, "base64url"))) {
     return { ok: false, status: 403, error: "Este debate se empezó con otro tema." };
+  }
+  // Foto: si el debate se empezó con una, cada turno trae su descripción exacta; si no, ninguna.
+  if (payload.fh) {
+    const fh = Buffer.from(huellaFoto(secreto, payload.id, turno.descripcionFoto ?? ""), "base64url");
+    if (!turno.descripcionFoto || !igualesSeguro(fh, Buffer.from(payload.fh, "base64url"))) {
+      return { ok: false, status: 403, error: "Este debate se empezó con otra foto." };
+    }
+  } else if (turno.descripcionFoto) {
+    return { ok: false, status: 403, error: "Este debate se empezó sin foto." };
   }
   const delRol = payload[turno.role];
   if (delRol.pr !== turno.provider || delRol.mo !== turno.model) {

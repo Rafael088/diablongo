@@ -10,6 +10,7 @@ import {
   MAX_MENSAJES_HISTORIAL,
   MAX_TEMA,
 } from "./topes.ts";
+import { validarDescripcionFoto } from "./foto.ts";
 
 export interface DatosTurno {
   topic: string;
@@ -20,6 +21,8 @@ export interface DatosTurno {
   apiKey: string;
   history: DebateMessage[];
   intervention?: string;
+  /** Descripción de la foto del dilema (lib/foto.ts); el token comprueba que sea la de /start. */
+  descripcionFoto?: string;
 }
 
 export type ResultadoValidacion =
@@ -90,7 +93,7 @@ export function validarProveedorModelo(
 export function validarTurno(body: unknown, ...args: [entorno?: string]): ResultadoValidacion {
   if (!esObjeto(body)) return fallo("El cuerpo de la petición no es válido.");
 
-  const { topic, role, phase, provider: providerId, model, apiKey, history, intervention } = body;
+  const { topic, role, phase, provider: providerId, model, apiKey, history, intervention, descripcionFoto } = body;
 
   const tema = validarTema(topic);
   if (!tema.ok) return fallo(tema.error);
@@ -146,6 +149,8 @@ export function validarTurno(body: unknown, ...args: [entorno?: string]): Result
   if (typeof intervention === "string" && intervention.length > MAX_INTERVENCION) {
     return fallo(`La intervención es demasiado larga (máximo ${MAX_INTERVENCION} caracteres).`);
   }
+  const foto = validarDescripcionFoto(descripcionFoto);
+  if (!foto.ok) return fallo(foto.error);
 
   return {
     ok: true,
@@ -158,6 +163,7 @@ export function validarTurno(body: unknown, ...args: [entorno?: string]): Result
       apiKey: !delServidor && typeof apiKey === "string" ? apiKey : "",
       history: historial,
       intervention: intervention as string | undefined,
+      ...(foto.descripcion ? { descripcionFoto: foto.descripcion } : {}),
     },
   };
 }

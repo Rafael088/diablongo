@@ -76,6 +76,9 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
   const readGateRef = useRef<(() => void) | null>(null);
   // Token del debate (de /api/debate/start). Solo en memoria: nunca en storage.
   const tokenRef = useRef<string | null>(null);
+  // Lo que se ve en la foto (lo describe /start): se reenvía en cada turno, ligado al token.
+  const descripcionFotoRef = useRef<string | undefined>(undefined);
+  const [descripcionFoto, setDescripcionFoto] = useState<string | null>(null);
   // Token de Turnstile: se usa una sola vez; si /start lo gasta, no se reenvía.
   const turnstileRef = useRef<string | undefined>(turnstile);
 
@@ -119,6 +122,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
         pro: { provider: config.pro.provider, model: config.pro.model, personalidad: config.pro.personalidad },
         con: { provider: config.con.provider, model: config.con.model, personalidad: config.con.personalidad },
         turnstile: verificacion,
+        ...(config.foto ? { foto: config.foto } : {}),
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -127,6 +131,10 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
       throw new Error(data.error || `Error ${response.status}`);
     }
     tokenRef.current = data.token;
+    if (typeof data.descripcionFoto === "string") {
+      descripcionFotoRef.current = data.descripcionFoto;
+      setDescripcionFoto(data.descripcionFoto);
+    }
     setDebateId(typeof data.debate === "string" ? data.debate : null);
     return data.token;
   }, [config]);
@@ -159,6 +167,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
               token,
               indice,
               topic: config.topic,
+              descripcionFoto: descripcionFotoRef.current,
               role: speaker,
               phase,
               provider: debater.provider,
@@ -348,6 +357,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
               token,
               indice: TOTAL_TURNS,
               topic: config.topic,
+              descripcionFoto: descripcionFotoRef.current,
               role: elegido,
               phase: "desenlace",
               provider: debater.provider,
@@ -371,5 +381,5 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
     [config, generate]
   );
 
-  return { messages, status, thinking, error, aviso, debateId, ayuda, esperandoSiguiente, siguiente, play, pause, intervene, textRead, stop, pedirDesenlace };
+  return { messages, status, thinking, error, aviso, debateId, descripcionFoto, ayuda, esperandoSiguiente, siguiente, play, pause, intervene, textRead, stop, pedirDesenlace };
 }

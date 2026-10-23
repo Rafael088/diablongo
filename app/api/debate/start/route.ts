@@ -4,7 +4,9 @@ import { TOTAL_LLAMADAS } from "@/lib/debateEngine";
 import { pasarGuardias, type ContextoInicio } from "@/lib/guardiasInicio";
 import { MENSAJE_SIN_SECRETO, emitirToken, obtenerSecreto, validarInicio } from "@/lib/tokenDebate";
 import { esObjeto } from "@/lib/validarTurno";
-import { MAX_CUERPO_BYTES } from "@/lib/topes";
+import { MAX_CUERPO_BYTES, MAX_CUERPO_INICIO_FOTO_BYTES } from "@/lib/topes";
+import { MENSAJE_FOTO_SOLO_CREDITOS, validarFoto } from "@/lib/foto";
+import { PROVEEDOR_CREDITOS } from "@/lib/creditosDebate";
 import { devolverDebate } from "@/lib/creditos";
 import { clienteAdmin } from "@/lib/supabase/admin";
 
@@ -16,8 +18,10 @@ import { clienteAdmin } from "@/lib/supabase/admin";
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let cobrado: { usuario: string; debateId: string } | null = null;
   try {
+    // Con foto el cuerpo puede pesar hasta MAX_CUERPO_INICIO_FOTO_BYTES; sin foto, el tope de siempre.
     const texto = await request.text();
-    if (Buffer.byteLength(texto, "utf8") > MAX_CUERPO_BYTES) {
+    const bytes = Buffer.byteLength(texto, "utf8");
+    if (bytes > MAX_CUERPO_INICIO_FOTO_BYTES) {
       return NextResponse.json({ error: "La petición es demasiado grande." }, { status: 413 });
     }
     let body: unknown;
@@ -26,10 +30,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } catch {
       return NextResponse.json({ error: "El cuerpo de la petición no es JSON." }, { status: 400 });
     }
+    const conFoto = esObjeto(body) && body.foto !== undefined && body.foto !== null;
+    if (!conFoto && bytes > MAX_CUERPO_BYTES) {
+      return NextResponse.json({ error: "La petición es demasiado grande." }, { status: 413 });
+    }
 
     const validacion = validarInicio(body);
     if (!validacion.ok) {
       return NextResponse.json({ error: validacion.error }, { status: 400 });
+    }
+
+    let foto: string | undefined;
+    if (conFoto) {
+      if (validacion.config.pro.provider !== PROVEEDOR_CREDITOS || validacion.config.con.provider !== PROVEEDOR_CREDITOS) {
+        return NextResponse.json({ error: MENSAJE_FOTO_SOLO_CREDITOS }, { status: 400 });
+      }
+      const f = validarFoto((body as Record<string, unknown>).foto);
+      if (!f.ok) return NextResponse.json({ error: f.error }, { status: 400 });
+      foto = f.dataUrl;
     }
 
     const secreto = obtenerSecreto();
@@ -42,6 +60,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       config: validacion.config,
       cuerpo: esObjeto(body) ? body : {},
       debateId: randomUUID(),
+      foto,
     };
     const rechazo = await pasarGuardias(ctx);
     if (rechazo) {
@@ -52,6 +71,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { token, payload } = emitirToken(validacion.config, secreto, Date.now(), {
       id: ctx.debateId,
       usuario: ctx.usuario,
+      descripcionFoto: ctx.descripcionFoto,
     });
     // `debate` es el id del debate (el mismo que va firmado en el token): con él se crea el reto (POST /api/retos).
     return NextResponse.json({ token, debate: payload.id, llamadas: TOTAL_LLAMADAS, expira: payload.exp, ...ctx.extra });

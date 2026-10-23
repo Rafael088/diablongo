@@ -1,43 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { clienteNavegador } from "@/lib/supabase/navegador";
 import { PAQUETES, textoPrecio } from "@/lib/paquetes";
-import { correoValido, estadoDeCuenta, textoCreditos, urlVueltaLogin, type EstadoCuenta } from "@/lib/cuenta";
+import { correoValido, textoCreditos, urlVueltaLogin, type EstadoCuenta } from "@/lib/cuenta";
 
-type Paso = "cerrado" | "abierto" | "enviando" | "enviado";
+/** Qué muestra el panel además del resumen: el login, los paquetes o nada. La controla ConfigPanel. */
+export type VistaCuenta = "nada" | "entrar" | "comprar";
 
-// Panel de cuenta: entrar con Google o con un enlace al correo, ver los créditos y salir.
+type Envio = "libre" | "enviando" | "enviado";
+
+interface CuentaProps {
+  estado: EstadoCuenta | null;
+  errorLogin: string | null;
+  recargar: () => void;
+  vista: VistaCuenta;
+  onVista: (v: VistaCuenta) => void;
+}
+
+// Panel de cuenta: entrar con Google o con un enlace al correo, ver los créditos, comprar y salir.
 // Las cuentas solo hacen falta para los créditos; sin Supabase configurado no se muestra nada.
-export default function Cuenta() {
+// El estado lo trae useCuenta (hooks/useCuenta.ts) para que el selector de modo también lo vea.
+export default function Cuenta({ estado, errorLogin, recargar, vista, onVista }: CuentaProps) {
   const supabase = clienteNavegador();
-  const [estado, setEstado] = useState<EstadoCuenta | null>(null);
-  const [paso, setPaso] = useState<Paso>("cerrado");
+  const [envio, setEnvio] = useState<Envio>("libre");
   const [correo, setCorreo] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [recarga, setRecarga] = useState(0);
-  const [comprando, setComprando] = useState(false);
   const [pagando, setPagando] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!supabase) return;
-    const ac = new AbortController();
-    fetch("/api/cuenta", { cache: "no-store", signal: ac.signal })
-      .then((r) => r.json())
-      .then((cuerpo) => {
-        setEstado(estadoDeCuenta(cuerpo));
-        if (new URLSearchParams(window.location.search).get("cuenta") === "error") {
-          setError("No pudimos abrir tu sesión. El enlace puede haber vencido: vuelve a intentarlo.");
-          window.history.replaceState(null, "", window.location.pathname);
-        }
-      })
-      .catch(() => {
-        if (!ac.signal.aborted) setEstado({ configurada: true, usuario: null });
-      });
-    return () => ac.abort();
-  }, [supabase, recarga]);
-
-  if (!supabase || !estado || !estado.configurada) return null;
+  if (!supabase) return null;
+  if (!estado) {
+    return (
+      <section className="ajustes-cuenta" aria-labelledby="cuenta-titulo" aria-busy="true">
+        <h3 id="cuenta-titulo" className="ajustes-seccion">Tu cuenta</h3>
+        <p className="config-aviso cuenta-cargando">Mirando tu cuenta…</p>
+      </section>
+    );
+  }
+  if (!estado.configurada) return null;
+  const mensajeError = error ?? errorLogin;
 
   const entrarConGoogle = async () => {
     setError(null);
@@ -54,16 +55,16 @@ export default function Cuenta() {
       return;
     }
     setError(null);
-    setPaso("enviando");
+    setEnvio("enviando");
     const { error } = await supabase.auth.signInWithOtp({
       email: correo.trim(),
       options: { emailRedirectTo: urlVueltaLogin(window.location.origin) },
     });
     if (error) {
-      setPaso("abierto");
+      setEnvio("libre");
       setError("No pudimos mandar el enlace. Espera un minuto y vuelve a intentarlo.");
     } else {
-      setPaso("enviado");
+      setEnvio("enviado");
     }
   };
 
@@ -90,82 +91,88 @@ export default function Cuenta() {
 
   const salir = async () => {
     await supabase.auth.signOut();
-    setPaso("cerrado");
-    setRecarga((n) => n + 1);
+    setEnvio("libre");
+    onVista("nada");
+    recargar();
   };
 
+  const comprando = vista === "comprar";
   return (
-    <section className="ajustes-cuenta" aria-labelledby="cuenta-titulo">
+    <section className="ajustes-cuenta" id="ajustes-cuenta" aria-labelledby="cuenta-titulo">
       <h3 id="cuenta-titulo" className="ajustes-seccion">Tu cuenta</h3>
-      <div className="config-aviso flex flex-wrap items-center justify-between gap-3">
-        {estado.usuario ? (
-          <>
-            <span>
-              {estado.usuario.email} · <strong>{textoCreditos(estado.usuario.creditos)}</strong>
-            </span>
-            <span className="flex gap-4">
-              <button type="button" className="underline" onClick={() => setComprando((v) => !v)} aria-expanded={comprando}>
-                Comprar créditos
-              </button>
-              <button type="button" className="underline" onClick={salir}>
-                Salir
-              </button>
-            </span>
-          </>
-        ) : paso === "cerrado" ? (
-          <>
-            <span>Entra para comprar créditos y usar los modelos buenos.</span>
-            <button type="button" className="underline" onClick={() => setPaso("abierto")}>
-              Entrar
+      {estado.usuario ? (
+        <div className="cuenta-sesion">
+          <p className="cuenta-correo">{estado.usuario.email}</p>
+          <p className="cuenta-saldo">
+            <strong>{textoCreditos(estado.usuario.creditos)}</strong>
+          </p>
+          <div className="cuenta-acciones">
+            <button
+              type="button"
+              className="config-modo cuenta-boton"
+              onClick={() => onVista(comprando ? "nada" : "comprar")}
+              aria-expanded={comprando}
+            >
+              <span className="config-modo-titulo">Comprar créditos</span>
             </button>
-          </>
-        ) : paso === "enviado" ? (
-          <span role="status">
-            Te mandamos un enlace a {correo.trim()}. Ábrelo en este mismo navegador para entrar.
-          </span>
-        ) : (
-          <div className="flex flex-col gap-3 w-full">
-            <button type="button" className="config-modo" onClick={entrarConGoogle}>
-              <span className="config-modo-titulo">Entrar con Google</span>
+            <button type="button" className="cuenta-salir" onClick={salir}>
+              Salir
             </button>
-            <label className="config-etiqueta" htmlFor="cuenta-correo">
-              O te mandamos un enlace al correo
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="cuenta-correo"
-                type="email"
-                autoComplete="email"
-                className="config-campo"
-                placeholder="tu@correo.com"
-                value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && pedirEnlace()}
-              />
-              <button type="button" className="config-modo" onClick={pedirEnlace} disabled={paso === "enviando"}>
-                <span className="config-modo-titulo">{paso === "enviando" ? "Enviando…" : "Mandar enlace"}</span>
-              </button>
-            </div>
           </div>
-        )}
-      </div>
+        </div>
+      ) : envio === "enviado" ? (
+        <p className="config-aviso" role="status">
+          Te mandamos un enlace a {correo.trim()}. Ábrelo en este mismo navegador para entrar.
+        </p>
+      ) : vista !== "entrar" ? (
+        <div className="cuenta-sesion">
+          <p className="cuenta-invita">Entra para jugar con créditos: modelos mejores, personalidades y fotos.</p>
+          <button type="button" className="config-modo cuenta-boton" onClick={() => onVista("entrar")}>
+            <span className="config-modo-titulo">Entrar</span>
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 w-full">
+          <button type="button" id="cuenta-google" className="config-modo cuenta-boton" onClick={entrarConGoogle}>
+            <span className="config-modo-titulo">Entrar con Google</span>
+          </button>
+          <label className="config-etiqueta" htmlFor="cuenta-correo">
+            O te mandamos un enlace al correo
+          </label>
+          <div className="cuenta-correo-fila">
+            <input
+              id="cuenta-correo"
+              type="email"
+              autoComplete="email"
+              className="config-campo"
+              placeholder="tu@correo.com"
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && pedirEnlace()}
+            />
+            <button type="button" className="config-modo cuenta-boton" onClick={pedirEnlace} disabled={envio === "enviando"}>
+              <span className="config-modo-titulo">{envio === "enviando" ? "Enviando…" : "Mandar enlace"}</span>
+            </button>
+          </div>
+        </div>
+      )}
       {estado.usuario && comprando && (
-        <ul className="flex flex-wrap gap-3 mt-3" aria-label="Paquetes de créditos">
+        <ul className="cuenta-paquetes" aria-label="Paquetes de créditos">
           {PAQUETES.map((p) => (
             <li key={p.id}>
-              <button type="button" className="config-modo" disabled={pagando !== null} onClick={() => comprar(p.id)}>
+              <button type="button" className="config-modo cuenta-paquete" disabled={pagando !== null} onClick={() => comprar(p.id)}>
                 <span className="config-modo-titulo">
                   {pagando === p.id ? "Abriendo el pago…" : `${p.nombre}: ${textoCreditos(p.creditos)}`}
                 </span>
-                <span>{textoPrecio(p.precioCop)}</span>
+                <span className="config-modo-detalle">{textoPrecio(p.precioCop)}</span>
               </button>
             </li>
           ))}
         </ul>
       )}
-      {error && (
+      {mensajeError && (
         <p className="caja-error" role="alert">
-          {error}
+          {mensajeError}
         </p>
       )}
     </section>

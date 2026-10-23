@@ -28,3 +28,12 @@ export const MAX_TOKENS_RESPUESTA = 120;
 
 /** Tamaño máximo del cuerpo de la petición, en bytes (el peor caso legítimo ronda 6 KB). */
 export const MAX_CUERPO_BYTES = 16 * 1024;
+
+/** /api/debate/start con foto (solo créditos): la foto ya llega reducida a ~1024 px desde el navegador. */
+export const MAX_CUERPO_INICIO_FOTO_BYTES = 1536 * 1024;
+
+/** Peso máximo de la foto ya decodificada, en bytes. */
+export const MAX_FOTO_BYTES = 1024 * 1024;
+
+/** Largo máximo de la descripción de la foto que se reenvía en cada turno, en caracteres. */
+export const MAX_DESCRIPCION_FOTO = 400;
