@@ -2,7 +2,7 @@
 
 import PixelSprite from "@/components/PixelSprite";
 import PantallaAyuda from "./PantallaAyuda";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { Bando } from "./PersonajeAnimado";
@@ -47,6 +47,11 @@ interface DebateArenaProps {
   desenlaceInicial?: string;
   /** Capturas: la tarjeta escribe su PNG real en la página. */
   volcadoTarjeta?: boolean;
+  /**
+   * Repetición de un reto (/r/<id>): sin intervención a la mitad, y al terminar se pinta esto en vez
+   * de «¿A quién le haces caso?», la tarjeta y el marcador (no se pide desenlace ni se suma marcador).
+   */
+  pantallaFinal?: (estado: { ganando: Ganando }) => ReactNode;
 }
 
 // Botones finales con las frases del ejemplo de interfaz del tablero de marca.
@@ -77,6 +82,7 @@ export default function DebateArena({
   eleccionInicial,
   desenlaceInicial,
   volcadoTarjeta = false,
+  pantallaFinal,
 }: DebateArenaProps) {
   // Personalidad elegida de cada personaje (en modo gratis la config trae la clásica): su sprite y su nombre.
   const idPersonalidad: Record<DebateRole, string | undefined> = { pro: config.pro.personalidad, con: config.con.personalidad };
@@ -87,7 +93,14 @@ export default function DebateArena({
   };
   // «el Ángel» / «el Diablo» (clásicos) o «Abuela» (las demás): para frases con «al».
   const alNombre = (r: DebateRole) => (esClasica(r, personalidadOClasica(r, idPersonalidad[r]).id) ? `al ${NOMBRES[r]}` : `a ${NOMBRES[r]}`);
-  const debate = useDebate(config, { generate, initialMessages, initialStatus, persist, turnstile });
+  const debate = useDebate(config, {
+    generate,
+    initialMessages,
+    initialStatus,
+    persist,
+    turnstile,
+    sinPausa: pantallaFinal !== undefined,
+  });
   const { messages, status, thinking, error, aviso, textRead, esperandoSiguiente, siguiente } = debate;
   const [interventionText, setInterventionText] = useState("");
   const soundEnabled = useSoundEnabled();
@@ -145,6 +158,7 @@ export default function DebateArena({
   }, [done, esperandoSiguiente, skip, siguiente]);
 
   const waitingIntervention =
+    !pantallaFinal &&
     status === "paused" &&
     !error &&
     done &&
@@ -324,6 +338,8 @@ export default function DebateArena({
               Iniciar
             </button>
           </div>
+        ) : enFinal && pantallaFinal ? (
+          <div className="caja-eleccion">{pantallaFinal({ ganando })}</div>
         ) : enFinal ? (
           <div className="caja-eleccion">
             {!eleccion ? (
@@ -436,7 +452,7 @@ export default function DebateArena({
         )}
       </div>
 
-      {enFinal && eleccion && desenlace && (
+      {enFinal && !pantallaFinal && eleccion && desenlace && (
         <>
           <TarjetaDesenlace
             tema={config.topic}

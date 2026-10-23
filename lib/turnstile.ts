@@ -3,6 +3,8 @@
  * Se usa desde guardiaTurnstile (lib/guardiasInicio.ts). El secreto nunca sale de aquí.
  */
 export const ACCION_TURNSTILE = "iniciar-debate";
+/** Acción del widget en la página de un reto (/r/<id>) al votar: un token de inicio no sirve para votar. */
+export const ACCION_TURNSTILE_VOTO = "votar-reto";
 export const URL_SITEVERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 export const TIEMPO_MAX_SITEVERIFY_MS = 5000;
 /** Un token de Turnstile real mide ~1 KB; más de esto no es un token. */
@@ -28,7 +30,8 @@ type Entorno = Record<string, string | undefined>;
 export async function verificarTurnstile(
   token: unknown,
   ip: string | null,
-  env: Entorno = process.env
+  env: Entorno = process.env,
+  accion: string = ACCION_TURNSTILE
 ): Promise<ResultadoTurnstile> {
   const secreto = env.TURNSTILE_SECRET_KEY?.trim();
   if (!secreto) {
@@ -67,7 +70,7 @@ export async function verificarTurnstile(
   // metadata.result_with_testing_key; esa marca depende solo del secreto (no del cliente).
   const meta = r.metadata as Record<string, unknown> | undefined;
   if (meta?.result_with_testing_key === true) return { ok: true };
-  if (r.action !== ACCION_TURNSTILE) return { ok: false, status: 403, error: MENSAJE_TURNSTILE_RECHAZADO };
+  if (r.action !== accion) return { ok: false, status: 403, error: MENSAJE_TURNSTILE_RECHAZADO };
   const hostname = env.TURNSTILE_HOSTNAME?.trim();
   if (hostname && r.hostname !== hostname) return { ok: false, status: 403, error: MENSAJE_TURNSTILE_RECHAZADO };
   return { ok: true };

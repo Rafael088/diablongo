@@ -44,6 +44,8 @@ interface UseDebateOptions {
   persist?: boolean;
   /** Token de Turnstile (de un solo uso) para /api/debate/start. */
   turnstile?: string;
+  /** Sin la pausa de intervención de la mitad (repetición de un reto: ahí nadie interviene). */
+  sinPausa?: boolean;
 }
 
 /**
@@ -52,7 +54,7 @@ interface UseDebateOptions {
  * pulsa «Siguiente» (`siguiente()`), salvo en la pausa de intervención y el final.
  */
 export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) {
-  const { generate, initialMessages, initialStatus = "idle", persist = true, turnstile } = options;
+  const { generate, initialMessages, initialStatus = "idle", persist = true, turnstile, sinPausa = false } = options;
   const [messages, setMessages] = useState<DebateMessage[]>(initialMessages ?? []);
   const [status, setStatus] = useState<DebateStatus>(initialStatus);
   const [thinking, setThinking] = useState(false);
@@ -253,7 +255,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
 
     pendingRef.current = false;
 
-    if (accion === "pausar") {
+    if (accion === "pausar" && !sinPausa) {
       // Mitad del debate: pausa para que el usuario pueda intervenir.
       updateStatus("paused");
       return;
@@ -261,7 +263,7 @@ export function useDebate(config: DebateConfig, options: UseDebateOptions = {}) 
 
     // Tiempo de leer y de dar 👍: el siguiente turno espera a `siguiente()`.
     if (statusRef.current === "running") fijarEspera(true);
-  }, [config.topic, executeTurn, fijarEspera, persist, updateStatus, waitUntilRead]);
+  }, [config.topic, executeTurn, fijarEspera, persist, sinPausa, updateStatus, waitUntilRead]);
 
   useEffect(() => {
     runNextTurnRef.current = runNextTurn;

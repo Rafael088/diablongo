@@ -372,3 +372,33 @@ textarea, input { caret-color: var(--color-acento); }
 .legal a { color: var(--color-texto); text-decoration: underline; text-underline-offset: 3px; }
 .legal strong { color: var(--color-texto); }
 .legal-volver { align-self: flex-start; font-weight: 700; }
+
+/* Página del reto /r/<id> (cotejo-6tlml4). */
+.reto-cabecera { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 48rem; margin: 0 auto 18px; text-align: center; }
+.reto-logo { color: inherit; text-decoration: none; }
+.reto-intro { margin: 0; color: var(--color-texto-suave); text-wrap: balance; }
+.reto-jugar { display: inline-block; text-decoration: none; text-align: center; }
+.reto-cargando, .reto-aviso { max-width: 36rem; margin: 24px auto; text-align: center; }
+.reto-saltar { display: flex; justify-content: center; margin-top: 6px; }
+.reto-resultado { display: flex; flex-direction: column; gap: 14px; }
+.reto-retador { display: flex; align-items: flex-start; gap: 12px; }
+.reto-retador svg { flex: none; width: 48px; height: 48px; }
+.reto-retador p { margin: 0; }
+.reto-desenlace { margin-top: 6px !important; color: var(--color-texto-suave); font-size: 1.05rem; }
+.reto-votos { display: flex; flex-direction: column; gap: 8px; font-size: 1rem; }
+.reto-votos-titulo { margin: 0; color: var(--color-texto-suave); }
+.reto-voto-fila { display: grid; grid-template-columns: minmax(6rem, auto) 1fr auto; align-items: center; gap: 10px; }
+.reto-voto-nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reto-voto-pista { position: relative; height: 16px; background: var(--color-fondo); border: 2px solid var(--color-borde); }
+.reto-voto-relleno { position: absolute; left: 0; top: 0; bottom: 0; }
+.reto-voto-pro { background: var(--color-angel); }
+.reto-voto-con { background: var(--color-diablo); }
+.reto-voto-cifra { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.reto-resultado .reto-jugar { align-self: center; }
+.reto-no-encontrado { max-width: 28rem; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.reto-no-encontrado-sprites { display: flex; gap: 12px; }
+.reto-no-encontrado-titulo { margin: 0; font-family: var(--font-titulo), ui-monospace, monospace; font-size: 0.9rem; line-height: 1.6; }
+@media (max-width: 420px) {
+  .reto-voto-fila { grid-template-columns: 1fr auto; }
+  .reto-voto-pista { grid-column: 1 / -1; grid-row: 2; }
+}
