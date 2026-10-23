@@ -62,6 +62,7 @@ En `.env.local` (desarrollo) o en Vercel (producción). Véase también [docs/cu
 | `UPSTASH_REDIS_REST_TOKEN` | Token de Redis (Upstash) | Igual que la anterior | Sí |
 | `LIMITE_IP_DIARIO` | Debates gratis por IP y día; por defecto 3 | No | Sí |
 | `CUPO_GLOBAL_DIARIO` | Debates gratis para todos por día; por defecto 111 (1.000 llamadas de OpenRouter ÷ 9 por debate) | No | Sí |
+| `METRICAS_CLAVE` | Contraseña de la página privada `/metricas` (contadores por día sin datos personales; Basic Auth: cualquier usuario + esta clave). Sin ella, `/metricas` da 404. Generar: `openssl rand -base64 24` | No (sin ella no hay página) | Sí |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Key pública de Cloudflare Turnstile (comprobación de persona) | En producción (sin ella no empieza ningún debate) | No |
 | `TURNSTILE_SECRET_KEY` | Key secreta de Cloudflare Turnstile | En producción | Sí |
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase | Para cuentas | No |

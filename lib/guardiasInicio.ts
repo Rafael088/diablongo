@@ -4,6 +4,7 @@ import { verificarTurnstile } from "./turnstile.ts";
 import type { ConfigInicio } from "./tokenDebate.ts";
 import { clienteServidor } from "./supabase/servidor.ts";
 import { clienteAdmin } from "./supabase/admin.ts";
+import { contar, contarLimiteGratis } from "./metricas.ts";
 import { descontarDebate } from "./creditos.ts";
 import { MENSAJE_TEMA_CRITICO, esTemaCritico } from "./temaCritico.ts";
 import {
@@ -82,6 +83,8 @@ export const guardiaLimiteGratis: GuardiaInicio = async (ctx) => {
     return null;
   }
   if (r.status === 503) return { status: 503, error: r.error };
+  // Métrica sin datos personales (lib/metricas.ts): solo el rechazo por IP, que es el límite de 3 gratis.
+  if (r.motivo === "ip") await contarLimiteGratis(ipDe(ctx.request));
   return { status: 429, error: r.error, campos: { quedan: r.quedan, reinicia: r.reinicia } };
 };
 
@@ -108,6 +111,7 @@ export const guardiaCreditos: GuardiaInicio = async (ctx) => {
     const cobro = await descontarDebate(admin, data.user.id, CREDITOS_POR_DEBATE, ctx.debateId);
     if (!cobro.ok) return { status: 402, error: MENSAJE_CREDITOS_INSUFICIENTES };
     ctx.usuario = data.user.id;
+    await contar("debate_creditos");
     ctx.extra = { ...ctx.extra, creditos: cobro.saldo };
     return null;
   } catch (e) {

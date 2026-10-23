@@ -29,5 +29,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Ni estáticos ni imágenes ni la API del debate (esa no usa la sesión de cuenta todavía).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|sprites/|api/debate|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|sprites/|api/debate|metricas|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
