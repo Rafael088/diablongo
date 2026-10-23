@@ -95,6 +95,11 @@ export default function Terminos() {
           Si estás en peligro, llama al 123 en Colombia o al número de emergencias de tu país. Para hablar con
           alguien sobre tu salud mental en Colombia, marca 192, opción 4.
         </p>
+        <p>
+          Si mandas una foto, una IA la describe en texto y los personajes debaten sobre esa descripción. La
+          descripción también la hace una máquina: puede equivocarse u omitir detalles. Una foto que muestre un
+          tema de riesgo también lleva a las líneas de ayuda.
+        </p>
       </section>
 
       <section>
@@ -103,6 +108,10 @@ export default function Terminos() {
         <ul>
           <li>Intentar que los personajes den instrucciones para hacerte daño o hacer daño a otros.</li>
           <li>Usar el juego para acosar, amenazar, difamar o exponer datos de otras personas.</li>
+          <li>
+            Mandar fotos de otras personas sin su permiso, fotos íntimas o de desnudos, fotos de menores de edad, o
+            fotos con contenido violento, ilegal o de terceros que no tengas derecho a usar.
+          </li>
           <li>
             Saltarse los límites del modo gratis, la comprobación de Cloudflare o cualquier medida de seguridad, o
             automatizar el uso con bots o scripts.
@@ -131,7 +140,8 @@ export default function Terminos() {
         <p>
           Los créditos se compran con Mercado Pago, que procesa el pago; nosotros no vemos ni guardamos los datos de
           tu tarjeta. Cada debate en el modo «Con créditos» descuenta lo que se indica antes de empezar y, si los
-          modelos fallan antes de terminar, el crédito se devuelve automáticamente. Los créditos solo sirven dentro
+          modelos fallan antes de terminar, el crédito se devuelve automáticamente. Lo mismo pasa si mandas una foto
+          que no podemos usar en el juego o que no pudimos ver. Los créditos solo sirven dentro
           de Diablongo, no son dinero y no se pueden transferir. El precio de cada paquete es el que ves al
           comprarlo.
         </p>
@@ -147,7 +157,22 @@ export default function Terminos() {
         <ul>
           <li>
             <strong>Tu dilema y las frases del debate</strong> se envían a los proveedores de IA para generar las
-            respuestas. No los guardamos en nuestro servidor. No escribas datos personales tuyos ni de otras personas.
+            respuestas. En los modos gratis, «Conectar OpenRouter» y «Mi key» no los guardamos en nuestro servidor.
+            No escribas datos personales tuyos ni de otras personas.
+          </li>
+          <li>
+            <strong>En el modo «Con créditos»</strong> guardamos en tu cuenta el dilema y las frases de cada debate,
+            para que puedas convertirlo en reto. Si no lo conviertes, se borran después de 7 días (la próxima vez
+            que juegas con créditos). Si creas un reto, el dilema, las frases y tu elección los puede ver cualquiera
+            que tenga el enlace.
+          </li>
+          <li>
+            <strong>Si mandas una foto</strong> (solo en el modo «Con créditos»), se envía, a través de OpenRouter,
+            a un proveedor de IA con visión (por ejemplo Google o Anthropic) para describirla en texto. No guardamos
+            la foto en nuestro servidor ni la usamos para nada más; solo la descripción viaja con el debate y no se
+            guarda en el reto. Antes de salir de tu dispositivo la foto se reduce de tamaño. Ese proveedor la trata
+            según sus propias políticas. Revisa que no muestre datos personales, documentos ni caras de otras
+            personas.
           </li>
           <li>
             <strong>Tu dirección IP</strong> se guarda cifrada (como un código que no se puede revertir) durante 48
@@ -192,9 +217,7 @@ export default function Terminos() {
         <h2>11. Contacto y ley aplicable</h2>
         <p>
           Para dudas, reclamos o solicitudes sobre tus datos, escríbenos en{" "}
-          <a href={CONTACTO_LEGAL.url} rel="noopener noreferrer" target="_blank">
-            {CONTACTO_LEGAL.texto}
-          </a>
+          <a href={CONTACTO_LEGAL.url}>{CONTACTO_LEGAL.texto}</a>
           . Estos términos se rigen por las leyes de la República de Colombia.
         </p>
       </section>

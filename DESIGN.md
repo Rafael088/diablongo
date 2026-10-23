@@ -4,7 +4,7 @@ Marca: **Diablongo**, «Tu cabeza es un campo de batalla». Antes se llamaba Age
 
 ## Términos y condiciones
 
-`/terminos` (`app/terminos/page.tsx`), modo lectura: resumen en una caja y 11 secciones (qué es, no es consejo profesional, tus decisiones son tuyas, contenido de IA, uso permitido, modos y terceros, créditos y pagos, datos, propiedad intelectual, cambios, contacto y ley colombiana). La fecha y el canal de contacto viven en `lib/legal.ts`. Capturas: `docs/inicio-sencillo.png`, `docs/inicio-movil.png`, `docs/ajustes.png`, `docs/terminos.png`.
+`/terminos` (`app/terminos/page.tsx`), modo lectura: resumen en una caja y 11 secciones (qué es, no es consejo profesional, tus decisiones son tuyas, contenido de IA, uso permitido, modos y terceros, créditos y pagos, datos, propiedad intelectual, cambios, contacto y ley colombiana). La fecha y el canal de contacto (soporte@cotejo.dev) viven en `lib/legal.ts`. Las fotos del modo créditos aparecen en contenido de IA (4), uso permitido (5), créditos (7) y datos (8). Capturas: `docs/inicio-sencillo.png`, `docs/inicio-movil.png`, `docs/ajustes.png`, `docs/terminos.png`.
 
 ## Personajes y tono
 
