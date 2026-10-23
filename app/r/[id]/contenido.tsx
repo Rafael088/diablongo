@@ -1,7 +1,8 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import RetoArena from "@/components/RetoArena";
 import { cargarReto } from "@/lib/cargarReto";
-import { contarEventoReto } from "@/lib/eventosReto";
+import { contarEventoReto, esRastreador } from "@/lib/eventosReto";
 import { vistaReto } from "@/lib/vistaReto";
 
 /**
@@ -19,7 +20,8 @@ export default async function ContenidoReto({ params }: { params: Promise<{ id: 
       </p>
     );
   }
-  // Enganche de contadores (cotejo-o7aqeg): ver lib/eventosReto.ts.
-  await contarEventoReto("reto_abierto", { retoId: carga.reto.id }).catch(() => {});
+  // Contador sin datos personales (lib/eventosReto.ts). Los bots de vista previa no son personas.
+  const agente = (await headers()).get("user-agent");
+  if (!esRastreador(agente)) await contarEventoReto("reto_abierto", { retoId: carga.reto.id }).catch(() => {});
   return <RetoArena reto={vistaReto(carga.reto)} />;
 }

@@ -25,10 +25,11 @@ import { ANA, crearBaseDePrueba, type BaseDePrueba } from "./ayudaPg";
 
 // connection() solo existe dentro de una petición real de Next; aquí la página se llama directo.
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), connection: async () => {} }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ "user-agent": "Mozilla/5.0" }) }));
 const cuentas = vi.hoisted(() => ({ admin: null as unknown }));
 vi.mock("@/lib/supabase/admin", () => ({ clienteAdmin: () => cuentas.admin }));
 const eventos = vi.hoisted(() => ({ contar: vi.fn(async () => {}) }));
-vi.mock("@/lib/eventosReto", () => ({ contarEventoReto: eventos.contar }));
+vi.mock("@/lib/eventosReto", () => ({ contarEventoReto: eventos.contar, esRastreador: () => false }));
 
 import { POST as VOTAR } from "@/app/api/retos/[id]/voto/route";
 import ContenidoReto from "@/app/r/[id]/contenido";

@@ -15,10 +15,16 @@ export interface Almacen {
   /** SET clave 1 NX PX ms: true si la creó, false si ya existía. */
   setNX(clave: string, ms: number): Promise<boolean>;
   del(clave: string): Promise<void>;
+  /** PFADD (HyperLogLog): anota un miembro para contar únicos sin poder recuperarlo después. */
+  pfadd(clave: string, miembro: string): Promise<void>;
+  /** PFCOUNT: cuántos miembros distintos (aproximado en Redis, exacto en memoria). */
+  pfcount(clave: string): Promise<number>;
 }
 
 export class AlmacenMemoria implements Almacen {
   private readonly datos = new Map<string, { valor: number; expira?: number }>();
+
+  private readonly conjuntos = new Map<string, { miembros: Set<string>; expira?: number }>();
 
   constructor(private readonly reloj: () => number = () => Date.now()) {}
 
@@ -49,6 +55,8 @@ export class AlmacenMemoria implements Almacen {
   async expire(clave: string, segundos: number): Promise<void> {
     const d = this.vivo(clave);
     if (d) d.expira = this.reloj() + segundos * 1000;
+    const c = this.conjuntos.get(clave);
+    if (c) c.expira = this.reloj() + segundos * 1000;
   }
   async setNX(clave: string, ms: number): Promise<boolean> {
     if (this.vivo(clave)) return false;
@@ -57,6 +65,20 @@ export class AlmacenMemoria implements Almacen {
   }
   async del(clave: string): Promise<void> {
     this.datos.delete(clave);
+    this.conjuntos.delete(clave);
+  }
+  async pfadd(clave: string, miembro: string): Promise<void> {
+    const c = this.conjuntos.get(clave) ?? { miembros: new Set<string>() };
+    c.miembros.add(miembro);
+    this.conjuntos.set(clave, c);
+  }
+  async pfcount(clave: string): Promise<number> {
+    const c = this.conjuntos.get(clave);
+    if (c?.expira !== undefined && c.expira <= this.reloj()) {
+      this.conjuntos.delete(clave);
+      return 0;
+    }
+    return c?.miembros.size ?? 0;
   }
 
   /** Claves vivas (solo para pruebas). */
@@ -89,6 +111,12 @@ export class AlmacenUpstash implements Almacen {
   }
   async del(clave: string): Promise<void> {
     await this.redis.del(clave);
+  }
+  async pfadd(clave: string, miembro: string): Promise<void> {
+    await this.redis.pfadd(clave, miembro);
+  }
+  pfcount(clave: string): Promise<number> {
+    return this.redis.pfcount(clave);
   }
 }
 

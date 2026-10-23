@@ -1,23 +1,27 @@
-// PUNTO DE ENGANCHE para los contadores (tarea cotejo-o7aqeg). Hoy no cuenta nada.
-//
-// Se llama desde dos sitios, una vez por evento:
-//  - "reto_abierto": app/r/[id]/contenido.tsx, cuando alguien abre /r/<id> y el reto existe
-//    (lo pinta el servidor; ojo: también cuenta las visitas de los bots que leen la vista previa).
-//  - "reto_votado": app/api/retos/[id]/voto/route.ts, solo cuando el voto entra por primera vez
-//    (registrado: true; los votos repetidos del mismo navegador no cuentan).
-//
-// Quien lo implemente: que nunca lance ni tarde (la página y el voto no deben esperar a un contador);
-// atrapar errores aquí dentro. No guardar el id del votante ni nada que identifique a la persona.
+// Eventos del reto (cotejo-o7aqeg): enganchados a los contadores de lib/metricas.ts.
+//  - "reto_abierto": app/r/[id]/contenido.tsx, cuando alguien abre /r/<id> y el reto existe.
+//  - "reto_votado": app/api/retos/[id]/voto/route.ts, solo cuando el voto entra por primera vez.
+// Nunca lanza. No se guarda el id del reto, el del votante ni a quién votó: solo «hoy hubo uno más».
+
+import { contar } from "./metricas.ts";
 
 export type EventoReto = "reto_abierto" | "reto_votado";
 
 export interface DatosEventoReto {
+  /** Se recibe por comodidad de quien llama, pero NO se guarda. */
   retoId: string;
-  /** Solo en "reto_votado": a quién votó. */
+  /** Solo en "reto_votado"; tampoco se guarda. */
   voto?: "pro" | "con";
 }
 
+/** Bots que leen la vista previa del enlace (WhatsApp, Facebook, X, Telegram, Discord...): no son personas. */
+const RASTREADORES = /whatsapp|facebookexternalhit|facebot|meta-externalagent|twitterbot|telegrambot|discordbot|slackbot|linkedinbot|skypeuripreview|bot\b|crawler|spider|preview/i;
+
+export function esRastreador(userAgent: string | null | undefined): boolean {
+  return !!userAgent && RASTREADORES.test(userAgent);
+}
+
 export async function contarEventoReto(evento: EventoReto, datos: DatosEventoReto): Promise<void> {
-  void evento;
   void datos;
+  await contar(evento).catch(() => {});
 }

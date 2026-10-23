@@ -11,6 +11,7 @@ import {
   retosDeUsuario,
   validarEleccion,
 } from "@/lib/retos";
+import { contar } from "@/lib/metricas";
 import { clienteServidor } from "@/lib/supabase/servidor";
 import { clienteAdmin } from "@/lib/supabase/admin";
 
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // sin_cobro y ajeno dan el mismo 403: no se revela si el debate existe en otra cuenta.
       return NextResponse.json({ error: MENSAJE_RETO_SIN_COBRO }, { status: 403 });
     }
+    if (r.creado) await contar("reto_creado");
     return NextResponse.json({ id: r.id, creado: r.creado, ruta: `/r/${r.id}` }, { status: r.creado ? 201 : 200 });
   } catch (error) {
     console.error("Retos error:", error instanceof Error ? error.message : "desconocido");
